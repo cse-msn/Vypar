@@ -1,0 +1,4 @@
+# MNM Fashion is a private business application; customer invoice links are
+# shared directly and should not be indexed.
+User-agent: *
+Disallow: /

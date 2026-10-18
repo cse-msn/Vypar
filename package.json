@@ -1,0 +1,26 @@
+{
+  "name": "mnm-fashion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MNM Fashion — unified inventory & billing platform (Web + installable PWA)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w backend",
+    "dev:web": "npm run dev -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "test": "npm run test -w backend",
+    "seed": "npm run seed -w backend",
+    "lint": "npm run lint -w backend --if-present && npm run lint -w frontend --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

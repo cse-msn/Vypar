@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  MNM Fashion — brand tokens.
+  Rani-berry primary + antique-gold accent on a warm plum-tinted neutral.
+  Grounded in festive ethnic womenswear (bandhani maroon, marigold gold).
+*/
+@layer base {
+  :root {
+    --background: 330 25% 98%;
+    --foreground: 312 24% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 312 24% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 312 24% 13%;
+
+    --primary: 334 69% 38%; /* rani-berry #A61E57 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 324 24% 94%;
+    --secondary-foreground: 318 22% 24%;
+
+    --muted: 322 20% 94%;
+    --muted-foreground: 316 10% 44%;
+
+    --accent: 330 46% 94%; /* soft berry tint for hovers */
+    --accent-foreground: 334 69% 30%;
+
+    --gold: 41 62% 48%; /* antique gold #C8972F — the one bold accent */
+    --gold-foreground: 36 55% 14%;
+
+    --destructive: 356 62% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 48% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 34 86% 44%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 322 22% 90%;
+    --input: 322 20% 88%;
+    --ring: 334 69% 38%;
+    --radius: 0.6rem;
+  }
+
+  .dark {
+    --background: 316 26% 8%;
+    --foreground: 326 30% 94%;
+    --card: 314 24% 11%;
+    --card-foreground: 326 30% 94%;
+    --popover: 314 24% 11%;
+    --popover-foreground: 326 30% 94%;
+
+    --primary: 336 66% 60%; /* lifted berry for dark bg */
+    --primary-foreground: 316 26% 8%;
+
+    --secondary: 315 18% 18%;
+    --secondary-foreground: 326 30% 94%;
+
+    --muted: 315 16% 18%;
+    --muted-foreground: 320 12% 64%;
+
+    --accent: 330 30% 22%;
+    --accent-foreground: 330 60% 90%;
+
+    --gold: 42 72% 60%;
+    --gold-foreground: 36 55% 12%;
+
+    --destructive: 356 60% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 46% 46%;
+    --success-foreground: 0 0% 100%;
+    --warning: 34 82% 56%;
+    --warning-foreground: 316 26% 8%;
+
+    --border: 315 16% 22%;
+    --input: 315 16% 22%;
+    --ring: 336 66% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'ss01';
+    /* Respect device notches / home indicators in installed PWA mode. */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+  /* Larger default touch targets on coarse pointers (phones/tablets). */
+  @media (pointer: coarse) {
+    button,
+    a,
+    [role='button'] {
+      min-height: 40px;
+    }
+  }
+}
+
+/* Display face — used deliberately for the wordmark and page titles. */
+.font-display {
+  font-family: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  font-optical-sizing: auto;
+}
+
+/* Utility: hide scrollbars on horizontally scrollable mobile tables. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
