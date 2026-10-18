@@ -68,12 +68,13 @@ export function ShareInvoiceDialog({
           return;
         }
       }
-      // Desktop: WhatsApp Web can't be handed a file by the browser, so download the PDF and
-      // open the chat with just the amount summary (no link) — then drag the file into the chat.
-      await openInvoicePdf(invoiceId, invoiceNumber, 'download');
+      // Desktop: WhatsApp Web can't be handed a file by the browser. Open the chat first (while we
+      // still have the click gesture, so the tab isn't popup-blocked), then download the PDF to drag in.
       if (share?.pdfWhatsappUrl) window.open(share.pdfWhatsappUrl, '_blank', 'noopener,noreferrer');
-      toast.success('PDF downloaded — WhatsApp opened', {
-        description: 'Drag the downloaded PDF into the chat (or tap 📎 → Document), then send.',
+      await openInvoicePdf(invoiceId, invoiceNumber, 'download');
+      toast.success('PDF downloaded — now attach it in WhatsApp', {
+        description: 'Drag the downloaded PDF into the open chat (or click 📎 → Document), then send.',
+        duration: 8000,
       });
     } catch (e) {
       if ((e as Error).name !== 'AbortError') toast.error(getApiError(e).message);
