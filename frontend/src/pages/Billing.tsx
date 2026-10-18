@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Minus, ShoppingCart, WifiOff } from 'lucide-react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, Minus, ShoppingCart, WifiOff, ScanLine, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { CustomerPicker } from '@/components/CustomerPicker';
@@ -13,10 +13,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/EmptyState';
 import { Spinner } from '@/components/ui/spinner';
 import { useCreateInvoice } from '@/hooks/invoices';
+import { lookupProduct } from '@/hooks/products';
 import { useOnline } from '@/hooks/useOnline';
 import { getApiError } from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
 import type { Customer, PaymentMethod, Product, Variant } from '@/types';
+
+// Lazy: the camera scanner pulls in the ~400 KB zxing library — only load it when opened.
+const BarcodeScanner = lazy(() =>
+  import('@/components/BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
+);
 
 interface Line {
   key: string;
@@ -45,6 +51,9 @@ export default function Billing() {
   const paidTouched = useRef(false);
   const idemKey = useRef(crypto.randomUUID());
   const [shareFor, setShareFor] = useState<{ id: string; number: string } | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanCode, setScanCode] = useState('');
+  const scanRef = useRef<HTMLInputElement>(null);
 
   const subtotal = useMemo(() => round2(lines.reduce((s, l) => s + l.price * l.quantity, 0)), [lines]);
   const discount = Math.min(discountAmount || 0, subtotal);
@@ -74,6 +83,38 @@ export default function Billing() {
     });
     // Default the bill's GST% from the product's tax rate (only if not set yet).
     if (product.taxRate && product.taxRate > 0) setTaxPercent((t) => (t === 0 ? product.taxRate! : t));
+  };
+
+  // Resolve a scanned/typed tag code (the Code-128 item code) and drop it straight into the bill.
+  const handleScanCode = async (raw: string) => {
+    const code = raw.trim();
+    if (!code) return;
+    try {
+      const res = await lookupProduct({ barcode: code });
+      const variant = res.variant;
+      if (variant) {
+        if (variant.quantity <= 0) {
+          toast.error(`${res.product.designNumber} · ${variant.color}/${variant.size} is out of stock`);
+        } else {
+          addLine(res.product, variant);
+          toast.success(`Added ${res.product.designNumber} · ${variant.color}/${variant.size}`);
+        }
+      } else {
+        // Scanned a design with no exact colour/size — open the picker to choose one.
+        toast.message('Pick a colour / size', { description: `${res.product.designNumber} · ${res.product.name}` });
+        setPickerOpen(true);
+      }
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    } finally {
+      setScanCode('');
+      scanRef.current?.focus(); // ready for the next scan
+    }
+  };
+
+  const submitScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    void handleScanCode(scanCode);
   };
 
   const updateLine = (key: string, patch: Partial<Line>) =>
@@ -145,6 +186,37 @@ export default function Billing() {
           <div>
             <Label>Customer</Label>
             <CustomerPicker value={customer} onChange={setCustomer} allowWalkIn />
+          </div>
+
+          <div>
+            <Label htmlFor="scan">Scan tag</Label>
+            <div className="flex gap-2">
+              <form onSubmit={submitScan} className="relative flex-1">
+                <ScanLine className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-primary" />
+                <Input
+                  id="scan"
+                  ref={scanRef}
+                  autoFocus
+                  inputMode="numeric"
+                  autoComplete="off"
+                  enterKeyHint="done"
+                  placeholder="Scan tag or type item code, then Enter"
+                  value={scanCode}
+                  onChange={(e) => setScanCode(e.target.value)}
+                  className="h-11 pl-10"
+                />
+              </form>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-11 w-11 shrink-0"
+                onClick={() => setScanOpen(true)}
+                aria-label="Scan with camera"
+              >
+                <Camera className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           <Button variant="outline" className="w-full" size="lg" onClick={() => setPickerOpen(true)}>
@@ -300,6 +372,18 @@ export default function Billing() {
       </div>
 
       <ProductPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={addLine} />
+      {scanOpen && (
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            open={scanOpen}
+            onOpenChange={setScanOpen}
+            onDetected={(code) => {
+              setScanOpen(false);
+              void handleScanCode(code);
+            }}
+          />
+        </Suspense>
+      )}
       {shareFor && (
         <ShareInvoiceDialog
           invoiceId={shareFor.id}

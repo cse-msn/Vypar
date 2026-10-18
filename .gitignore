@@ -19,8 +19,9 @@ logs/
 *.log
 npm-debug.log*
 
-# local storage (dev object-storage fallback)
+# local storage (dev + test object-storage fallback)
 backend/.storage/
+backend/.storage-test/
 backend/uploads/
 
 # os / editor
@@ -36,5 +37,6 @@ coverage/
 # pwa generated
 frontend/dev-dist/
 
-# generated report artifacts
-backend/api-test-report.pdf
+# PDFs are generated at runtime (invoices, labels, reports) or are local reference
+# docs — never commit them to the repo
+*.pdf

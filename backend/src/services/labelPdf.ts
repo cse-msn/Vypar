@@ -8,6 +8,8 @@ export interface LabelItem {
   color: string;
   designName: string;
   size: string;
+  /** Size run the design comes in, e.g. "20-24-28-32-36" — printed left of the price code. */
+  sizeGroup?: string;
   priceCode: string;
 }
 
@@ -88,7 +90,13 @@ function renderSheet(items: LabelItem[], cache: Map<string, Buffer>): Promise<Bu
       const row2 = row1 + 13;
       doc.font('Helvetica').fontSize(9).fillColor(INK).text(it.designName, x + p, row2 + 3, { width: labelW * 0.62, lineBreak: false, ellipsis: true });
       doc.font('Helvetica-Bold').fontSize(16).fillColor(INK).text(it.size, right - 60, row2, { width: 60, align: 'right', lineBreak: false });
-      doc.font('Helvetica').fontSize(8.5).fillColor(INK).text(it.priceCode, x + p, y + labelH - 13, { width: labelW - p * 2, align: 'center', lineBreak: false });
+      // Bottom row: size group (left) · coded price (centered in the remaining width)
+      const botY = y + labelH - 13;
+      const grpW = it.sizeGroup ? (labelW - p * 2) * 0.42 : 0;
+      if (it.sizeGroup) {
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(INK).text(it.sizeGroup, x + p, botY, { width: grpW, align: 'left', lineBreak: false, ellipsis: true });
+      }
+      doc.font('Helvetica').fontSize(8.5).fillColor(INK).text(it.priceCode, x + p + grpW, botY, { width: labelW - p * 2 - grpW, align: 'center', lineBreak: false });
     });
 
     doc.end();
@@ -131,8 +139,13 @@ function renderRoll(items: LabelItem[], cache: Map<string, Buffer>, widthMm: num
       doc.font('Helvetica').fontSize(6).fillColor(INK).text(it.designName, p, r2 + 3, { width: w * 0.6, lineBreak: false, ellipsis: true });
       doc.font('Helvetica-Bold').fontSize(12).fillColor(INK).text(it.size, right - 34, r2, { width: 34, align: 'right', lineBreak: false });
 
-      // Coded price (centered, bottom)
-      doc.font('Helvetica').fontSize(6).fillColor(INK).text(it.priceCode, p, h - 9, { width: w - p * 2, align: 'center', lineBreak: false });
+      // Bottom row: size group (left) · coded price (centered in the remaining width)
+      const botY = h - 9;
+      const grpW = it.sizeGroup ? (w - p * 2) * 0.42 : 0;
+      if (it.sizeGroup) {
+        doc.font('Helvetica-Bold').fontSize(6).fillColor(INK).text(it.sizeGroup, p, botY, { width: grpW, align: 'left', lineBreak: false, ellipsis: true });
+      }
+      doc.font('Helvetica').fontSize(6).fillColor(INK).text(it.priceCode, p + grpW, botY, { width: w - p * 2 - grpW, align: 'center', lineBreak: false });
     });
 
     doc.end();

@@ -155,6 +155,9 @@ router.get(
     }
     if (variants.length === 0) throw ApiError.badRequest('This product has no variants to label');
 
+    // The size run the design comes in (across all its variants), e.g. "20-24-28-32-36".
+    const sizeGroup = formatSizeGroup(product.variants.map((v) => v.size));
+
     const items: LabelItem[] = [];
     for (const v of variants) {
       const label: LabelItem = {
@@ -164,6 +167,7 @@ router.get(
         color: v.color,
         designName: product.name,
         size: v.size,
+        sizeGroup,
         priceCode: encodePrice(v.sellingPrice ?? product.sellingPrice ?? 0),
       };
       for (let i = 0; i < copies; i++) items.push(label);
@@ -177,6 +181,15 @@ router.get(
     res.send(pdf);
   }),
 );
+
+/** Distinct sizes a design is sold in, as a "20-24-28-32-36" run (numeric sizes sorted). */
+function formatSizeGroup(sizes: string[]): string {
+  const distinct = Array.from(new Set(sizes.map((s) => s.trim()).filter(Boolean)));
+  if (distinct.length && distinct.every((s) => /^\d+$/.test(s))) {
+    distinct.sort((a, b) => Number(a) - Number(b));
+  }
+  return distinct.join('-');
+}
 
 /** Reject duplicate (colour, size) pairs within a product. */
 function assertUniqueVariants(variants: { color: string; size: string }[]) {

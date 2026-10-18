@@ -50,11 +50,11 @@ const schema = z.object({
   SHOP_BANK_IFSC: z.string().default(''),
   SHOP_DEFAULT_HSN: z.string().default(''),
 
-  // Coded price printed on product tags. Format: <YY><YY+1><mid><price padded><suffix>
-  // where YY = current year's last 2 digits (auto-rolls each year).
-  // e.g. 2026 + mid 1008 + price 1200 + suffix 27 → 26271008120027
-  PRICE_CODE_MID: z.string().default('1008'),
-  PRICE_CODE_SUFFIX: z.string().default('27'),
+  // Coded price printed on product tags. Format: <YY><mid><price padded><suffix>
+  // where YY = current year's last 2 digits (ONLY this rolls); mid + suffix stay fixed.
+  // e.g. 2026 + mid 271008 + price 1200 + suffix 23 → 26271008120023 ; 2027 → 27271008120023
+  PRICE_CODE_MID: z.string().default('271008'),
+  PRICE_CODE_SUFFIX: z.string().default('23'),
   PRICE_CODE_PAD: z.coerce.number().int().min(0).max(8).default(4),
   // Optional: pin the year (2-or-4 digit) instead of using the current year.
   PRICE_CODE_YEAR: z.coerce.number().int().optional(),
