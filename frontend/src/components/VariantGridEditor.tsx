@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useSizeGroups } from '@/hooks/sizeGroups';
+import { useColors } from '@/hooks/colors';
 
 // Built-in fallback size groups — used only if none are configured in Settings
 // (or while they're still loading) so the product form always works.
@@ -49,10 +49,11 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
   }, [fetchedGroups]);
   const groupNames = Object.keys(sizeGroups);
 
+  const { data: colors } = useColors();
+  const colorNames = (colors ?? []).map((c) => c.name);
+
   const [group, setGroup] = useState<string>('');
   const [rows, setRows] = useState<Row[]>([{ color: '', cells: {} }]);
-  const [salePrice, setSalePrice] = useState(0);
-  const [costPrice, setCostPrice] = useState(0);
 
   // Keep the selected group valid as groups load/change.
   useEffect(() => {
@@ -72,11 +73,11 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
       for (const size of sizes) {
         const raw = r.cells[size];
         if (raw === undefined || raw === '') continue; // empty cell → not a variant
-        variants.push({ color, size, quantity: Math.max(0, Number(raw) || 0), sellingPrice: salePrice || undefined, costPrice: costPrice || undefined });
+        variants.push({ color, size, quantity: Math.max(0, Number(raw) || 0) });
       }
     }
-    onChangeRef.current({ variants, salePrice, costPrice, sizeGroup: group });
-  }, [rows, sizes, salePrice, costPrice, group]);
+    onChangeRef.current({ variants, salePrice: 0, costPrice: 0, sizeGroup: group });
+  }, [rows, sizes, group]);
 
   const setCell = (ri: number, size: string, val: string) =>
     setRows((prev) => prev.map((r, i) => (i === ri ? { ...r, cells: { ...r.cells, [size]: val.replace(/[^\d]/g, '') } } : r)));
@@ -90,26 +91,16 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div>
-          <Label>Size group</Label>
-          <Select value={group} onValueChange={setGroup}>
-            <SelectTrigger><SelectValue placeholder="Select size group" /></SelectTrigger>
-            <SelectContent>
-              {groupNames.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label>Sale price (all)</Label>
-          <Input inputMode="decimal" value={salePrice || ''} onChange={(e) => setSalePrice(Number(e.target.value) || 0)} />
-        </div>
-        <div>
-          <Label>Cost price (all)</Label>
-          <Input inputMode="decimal" value={costPrice || ''} onChange={(e) => setCostPrice(Number(e.target.value) || 0)} />
-        </div>
+      <div className="sm:max-w-xs">
+        <Label>Size group</Label>
+        <Select value={group} onValueChange={setGroup}>
+          <SelectTrigger><SelectValue placeholder="Select size group" /></SelectTrigger>
+          <SelectContent>
+            {groupNames.map((g) => (
+              <SelectItem key={g} value={g}>{g}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="overflow-x-auto rounded-lg border">
@@ -128,7 +119,14 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
             {rows.map((r, ri) => (
               <tr key={ri} className="border-t">
                 <td className="p-1.5">
-                  <Input className="h-9 w-28" placeholder="e.g. Red" value={r.color} onChange={(e) => setColor(ri, e.target.value)} />
+                  <Select value={r.color} onValueChange={(v) => setColor(ri, v)}>
+                    <SelectTrigger className="h-9 w-32"><SelectValue placeholder="Colour" /></SelectTrigger>
+                    <SelectContent>
+                      {/* Keep a previously-chosen colour selectable even if it's no longer in the list. */}
+                      {r.color && !colorNames.includes(r.color) && <SelectItem value={r.color}>{r.color}</SelectItem>}
+                      {colorNames.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </td>
                 {sizes.map((sz) => {
                   const empty = !r.cells[sz];

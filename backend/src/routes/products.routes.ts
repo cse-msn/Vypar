@@ -8,7 +8,6 @@ import { Product, type ProductDoc } from '../models/Product';
 import { paginationSchema, paginate, buildMeta } from '../utils/pagination';
 import { escapeRegex } from '../utils/regex';
 import { generateLabelsPdf, type LabelItem } from '../services/labelPdf';
-import { encodePrice } from '../utils/priceCode';
 import { env } from '../config/env';
 
 const router = Router();
@@ -235,6 +234,11 @@ function buildLabelItems(product: ProductDoc, variants: ProductDoc['variants'][n
   const fullGroup = product.sizeGroup?.trim() || formatSizeGroup(product.variants.map((v) => v.size));
   // On the tag show only the range ends, e.g. "20-24-28-32-36" → "20-36", "S-M-L-XL" → "S-XL".
   const sizeGroup = sizeRangeEnds(fullGroup);
+  // Tag price shown as "<prefix>-<B2B>-<B2C>" (e.g. 10082327-450-855). Fall back to the
+  // selling price for legacy products that predate B2B/B2C.
+  const b2b = product.b2bPrice ?? product.sellingPrice ?? 0;
+  const b2c = product.b2cPrice ?? product.sellingPrice ?? 0;
+  const priceCode = `${env.priceCode.tagPrefix}-${fmtPrice(b2b)}-${fmtPrice(b2c)}`;
   const items: LabelItem[] = [];
   for (const v of variants) {
     const label: LabelItem = {
@@ -245,12 +249,16 @@ function buildLabelItems(product: ProductDoc, variants: ProductDoc['variants'][n
       designName: product.name,
       size: v.size,
       sizeGroup,
-      // Tag price is the (coded) B2B price; fall back to selling price for legacy products without one.
-      priceCode: encodePrice(product.b2bPrice ?? v.sellingPrice ?? product.sellingPrice ?? 0),
+      priceCode,
     };
     for (let i = 0; i < copies; i++) items.push(label);
   }
   return items;
+}
+
+/** Format a money amount for the tag: whole numbers stay plain, else up to 2 decimals (no trailing zeros). */
+function fmtPrice(n: number): string {
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
 }
 
 /** Reduce a dash-joined size run to just its ends: "20-24-28-32-36" → "20-36". Single size unchanged. */

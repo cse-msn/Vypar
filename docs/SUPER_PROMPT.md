@@ -69,9 +69,11 @@ Monorepo via **npm workspaces**: `backend/`, `frontend/`. (A `storefront/` app i
 - Apparel attributes (shown only for apparel categories): dupatta (Y/N), dupatta height, back opening
   (Open/Closed/Backless), blouse size (from the size groups), gher, cap, belt, sleeves (Full/Half/Sleeveless),
   back knot/hook, pant/dhoti. Plus tax rate, HSN, unit, images/videos, custom fields.
-- **Size groups**: owner-managed CRUD in Settings; drive the variant grid and the blouse-size dropdown.
+- **Size groups** and **Colours**: owner-managed CRUD in Settings. Size groups drive the variant grid and
+  blouse-size dropdown; colours drive the variant colour dropdown (grid + row editors).
 - **Barcodes/labels**: Code-128, **50×25 mm thermal** (one/label) + A4 (12-up) + **bulk** (all/filtered);
-  tag shows design no., "MNM Fashion, Pune", colour, size, size-range ends (`20-36`), and the **coded B2B price**.
+  tag shows design no., "MNM Fashion, Pune", colour, size, size-range ends (`20-36`), and the price as
+  `<prefix>-<B2B>-<B2C>` (e.g. `10082327-450-855`). On the product form, B2C auto-fills to **1.9× B2B** (editable).
 - Stock lookup by barcode (camera/scanner) or design/colour/size; inline adjust.
 
 **Transactions**
@@ -129,7 +131,7 @@ There's a harmless pre-existing `vitest` type error in `*.test.*` files; judge c
 - Keep the `{ data }` / `{ data, meta }` envelope and the list-vs-single `.data` / `.data.data` read split.
 - New stock-affecting logic goes through `services/stock.ts`, never ad-hoc `$inc`.
 - New list endpoints reuse `paginationSchema` + `paginate` + `buildMeta`.
-- Tag prices stay obfuscated (`encodePrice`); the customer/catalog price is `b2cPrice` (fallback `sellingPrice`).
+- Tag price format is `<prefix>-<B2B>-<B2C>` (`buildLabelItems`); the customer/catalog price is `b2cPrice` (fallback `sellingPrice`).
 - Public store routes never expose cost/B2B/supplier/HSN.
 - Adding a product field means wiring model → validation → type → form schema/defaults/reset/submit → UI
   (see the `add-product-field` skill). Adding an entity: see the `add-endpoint` skill.

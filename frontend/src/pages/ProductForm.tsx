@@ -11,6 +11,7 @@ import { qk } from '@/lib/queryKeys';
 import { useProduct } from '@/hooks/products';
 import { useSuppliers } from '@/hooks/suppliers';
 import { useSizeGroups } from '@/hooks/sizeGroups';
+import { useColors } from '@/hooks/colors';
 import { PageHeader } from '@/components/PageHeader';
 import { MediaManager } from '@/components/MediaManager';
 import { CustomFieldsEditor } from '@/components/CustomFieldsEditor';
@@ -36,6 +37,10 @@ const CATEGORIES = [
   'Jewellery & Accessories',
   'Raw Material',
 ] as const;
+
+// Default B2B / B2C prices derived from the purchase (cost) price — editable afterwards.
+const B2B_FROM_PURCHASE = 1.6; // 160%
+const B2C_FROM_PURCHASE = 2.1; // 210%
 
 // Apparel categories that get a sub-category dropdown (everything except
 // Jewellery & Accessories and Raw Material).
@@ -141,10 +146,15 @@ export default function ProductForm() {
   const { data: sizeGroups } = useSizeGroups();
   const blouseSizeOptions = Array.from(new Set((sizeGroups ?? []).flatMap((g) => g.sizes)));
   const sizeGroupOptions = (sizeGroups ?? []).map((g) => g.name);
+  const { data: colors } = useColors();
+  const colorNames = (colors ?? []).map((c) => c.name);
 
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
+  // Once the user edits a price by hand, stop auto-deriving it from the purchase price.
+  const [b2bTouched, setB2bTouched] = useState(false);
+  const [b2cTouched, setB2cTouched] = useState(false);
   const [entryMode, setEntryMode] = useState<'grid' | 'rows'>('grid'); // create only
   const [grid, setGrid] = useState<GridPayload>({ variants: [], salePrice: 0, costPrice: 0, sizeGroup: '' });
 
@@ -154,13 +164,14 @@ export default function ProductForm() {
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { designNumber: '', name: '', unit: 'Pcs', costPrice: '', sellingPrice: '', b2bPrice: '', b2cPrice: '', variants: [{ ...emptyVariant }] },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'variants' });
 
   useEffect(() => {
     if (product) {
@@ -204,15 +215,45 @@ export default function ProductForm() {
       setCustomFields(product.customFields ?? []);
       setImages(product.images?.length ? product.images : product.imageUrl ? [product.imageUrl] : []);
       setVideos(product.videos ?? []);
+      // Existing product already has its own B2B/B2C — don't auto-overwrite them from purchase price.
+      if (product.b2bPrice != null) setB2bTouched(true);
+      if (product.b2cPrice != null) setB2cTouched(true);
       setEntryMode('rows');
     }
   }, [product, reset]);
 
   const useGrid = !isEdit && entryMode === 'grid';
 
+  // In grid mode the variant matrix is built by VariantGridEditor, so clear the form's
+  // field-array (otherwise its hidden empty row fails colour/size validation and silently
+  // blocks submit). Rows mode needs at least one row.
+  useEffect(() => {
+    if (useGrid) {
+      if (fields.length) replace([]);
+    } else if (!isEdit && !fields.length) {
+      replace([{ ...emptyVariant }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useGrid]);
+
   // Show the sub-category dropdown only for apparel categories.
   const selectedCategory = watch('category');
   const showSubCategory = !!selectedCategory && APPAREL_CATEGORIES.includes(selectedCategory);
+
+  // Surface validation failures (otherwise a hidden invalid field makes "Create" do nothing).
+  const firstError = (o: unknown): string | undefined => {
+    if (!o || typeof o !== 'object') return undefined;
+    const rec = o as Record<string, unknown>;
+    if (typeof rec.message === 'string' && rec.message) return rec.message;
+    for (const [k, v] of Object.entries(rec)) {
+      if (k === 'ref') continue;
+      const m = firstError(v);
+      if (m) return m;
+    }
+    return undefined;
+  };
+  const onInvalid = (errs: typeof errors) =>
+    toast.error(firstError(errs) ?? 'Please fill the required fields');
 
   const onSubmit = async (values: FormValues) => {
     const isApparel = !!values.category && APPAREL_CATEGORIES.includes(values.category);
@@ -309,7 +350,7 @@ export default function ProductForm() {
         }
       />
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
         <Card>
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -562,17 +603,49 @@ export default function ProductForm() {
             <div><Label>HSN code</Label><Input placeholder="e.g. 6209" {...register('hsnCode')} /></div>
             <div><Label>Unit</Label><Input placeholder="Pcs" {...register('unit')} /></div>
             <div><Label>Tax rate (GST %)</Label><Input type="number" inputMode="decimal" step="0.01" placeholder="e.g. 12" {...register('taxRate')} /></div>
-            <div><Label>Purchase price</Label><Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('costPrice')} /></div>
-            <div><Label>Selling price</Label><Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('sellingPrice')} /></div>
+            <div>
+              <Label>Purchase price</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                onKeyDown={blockNonNumericKeys}
+                onPaste={sanitizeNumericPaste}
+                {...register('costPrice', {
+                  onChange: (e) => {
+                    // Auto-fill B2B (160%) and B2C (190%) from the purchase price, until each is edited by hand.
+                    const cost = Number(String(e.target.value).replace(/[^\d.]/g, ''));
+                    if (!b2bTouched) setValue('b2bPrice', cost > 0 ? String(Math.round(cost * B2B_FROM_PURCHASE)) : '');
+                    if (!b2cTouched) setValue('b2cPrice', cost > 0 ? String(Math.round(cost * B2C_FROM_PURCHASE)) : '');
+                  },
+                })}
+              />
+            </div>
             <div>
               <Label>B2B price *</Label>
-              <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('b2bPrice')} />
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                onKeyDown={blockNonNumericKeys}
+                onPaste={sanitizeNumericPaste}
+                {...register('b2bPrice', { onChange: () => setB2bTouched(true) })}
+              />
               {errors.b2bPrice && <p className="mt-1 text-xs text-destructive">{errors.b2bPrice.message}</p>}
+              <p className="mt-1 text-xs text-muted-foreground">Auto-set to 160% of purchase price — edit if needed.</p>
             </div>
             <div>
               <Label>B2C price *</Label>
-              <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('b2cPrice')} />
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                onKeyDown={blockNonNumericKeys}
+                onPaste={sanitizeNumericPaste}
+                {...register('b2cPrice', { onChange: () => setB2cTouched(true) })}
+              />
               {errors.b2cPrice && <p className="mt-1 text-xs text-destructive">{errors.b2cPrice.message}</p>}
+              <p className="mt-1 text-xs text-muted-foreground">Auto-set to 210% of purchase price — edit if needed.</p>
             </div>
             <div className="sm:col-span-2"><Label>Description</Label><Textarea {...register('description')} /></div>
           </CardContent>
@@ -613,7 +686,22 @@ export default function ProductForm() {
               <>
                 {fields.map((field, i) => (
                   <div key={field.id} className="grid grid-cols-2 gap-2 rounded-lg border p-3 sm:grid-cols-7 sm:items-end">
-                    <div><Label className="text-xs">Colour *</Label><Input placeholder="Red" {...register(`variants.${i}.color`)} /></div>
+                    <div>
+                      <Label className="text-xs">Colour *</Label>
+                      <Controller
+                        control={control}
+                        name={`variants.${i}.color`}
+                        render={({ field }) => (
+                          <Select value={field.value || ''} onValueChange={field.onChange}>
+                            <SelectTrigger><SelectValue placeholder="Colour" /></SelectTrigger>
+                            <SelectContent>
+                              {field.value && !colorNames.includes(field.value) && <SelectItem value={field.value}>{field.value}</SelectItem>}
+                              {colorNames.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    </div>
                     <div><Label className="text-xs">Size *</Label><Input placeholder="40" {...register(`variants.${i}.size`)} /></div>
                     <div><Label className="text-xs">Qty</Label><Input type="number" inputMode="numeric" {...register(`variants.${i}.quantity`)} /></div>
                     <div><Label className="text-xs">Sell ₹</Label><Input type="number" inputMode="decimal" placeholder="dflt" {...register(`variants.${i}.sellingPrice`)} /></div>

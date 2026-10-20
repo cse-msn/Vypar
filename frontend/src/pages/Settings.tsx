@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserCog, ShieldCheck, Ruler, Pencil, Trash2, Store } from 'lucide-react';
+import { Plus, UserCog, ShieldCheck, Ruler, Pencil, Trash2, Store, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,8 @@ import { api, getApiError } from '@/lib/api';
 import { qk } from '@/lib/queryKeys';
 import { useAuth } from '@/context/AuthContext';
 import { useSizeGroups, useCreateSizeGroup, useUpdateSizeGroup, useDeleteSizeGroup } from '@/hooks/sizeGroups';
-import type { Role, ShopDetails, SizeGroup, User } from '@/types';
+import { useColors, useCreateColor, useUpdateColor, useDeleteColor } from '@/hooks/colors';
+import type { Role, ShopDetails, SizeGroup, Color, User } from '@/types';
 
 function Field({ label, value }: { label: string; value?: string | null }) {
   return (
@@ -127,6 +128,7 @@ export default function Settings() {
       </Card>
 
       {me?.role === 'owner' && <SizeGroupsCard />}
+      {me?.role === 'owner' && <ColorsCard />}
 
       <Card className="mt-5">
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" /> About</CardTitle></CardHeader>
@@ -400,6 +402,84 @@ function SizeGroupDialog({ group, onClose }: { group: SizeGroup | null; onClose:
             <Label>Sizes (comma separated)</Label>
             <Input placeholder="e.g. 20, 24, 28, 32, 36" value={sizes} onChange={(e) => setSizes(e.target.value)} />
             <p className="mt-1 text-xs text-muted-foreground">Order matters — sizes appear as columns in the product grid.</p>
+          </div>
+          <Button className="w-full" onClick={save} disabled={pending}>{pending && <Spinner className="h-4 w-4" />} Save</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ColorsCard() {
+  const { data: colors, isLoading } = useColors();
+  const del = useDeleteColor();
+  const [editing, setEditing] = useState<Color | null | 'new'>(null);
+
+  const remove = async (c: Color) => {
+    if (!window.confirm(`Delete colour "${c.name}"? This only removes the option; existing products are unaffected.`)) return;
+    try {
+      await del.mutateAsync(c._id);
+      toast.success('Colour deleted');
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    }
+  };
+
+  return (
+    <Card className="mt-5">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2 text-base"><Palette className="h-4 w-4" /> Colours</CardTitle>
+        <Button size="sm" onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add colour</Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <LoadingScreen />
+        ) : !colors?.length ? (
+          <p className="py-4 text-sm text-muted-foreground">No colours yet. Add one to use it when creating products.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {colors.map((c) => (
+              <div key={c._id} className="flex items-center gap-1 rounded-full border bg-muted/40 py-1 pl-3 pr-1 text-sm">
+                <span className="font-medium">{c.name}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Edit" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Delete" onClick={() => remove(c)} disabled={del.isPending}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      {editing && <ColorDialog color={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+    </Card>
+  );
+}
+
+function ColorDialog({ color, onClose }: { color: Color | null; onClose: () => void }) {
+  const create = useCreateColor();
+  const update = useUpdateColor(color?._id ?? '');
+  const [name, setName] = useState(color?.name ?? '');
+
+  const save = async () => {
+    if (!name.trim()) return toast.error('Name is required');
+    try {
+      if (color) await update.mutateAsync({ name: name.trim() });
+      else await create.mutateAsync({ name: name.trim() });
+      toast.success(color ? 'Colour updated' : 'Colour added');
+      onClose();
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    }
+  };
+
+  const pending = create.isPending || update.isPending;
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>{color ? 'Edit colour' : 'Add colour'}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Name</Label>
+            <Input autoFocus placeholder="e.g. Royal Blue" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <Button className="w-full" onClick={save} disabled={pending}>{pending && <Spinner className="h-4 w-4" />} Save</Button>
         </div>

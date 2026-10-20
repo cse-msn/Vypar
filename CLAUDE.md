@@ -65,7 +65,7 @@ Conventions every route follows:
 - **`applyToJSON` (`utils/toJSON.ts`)** standardizes every model's serialization: adds `id`, strips `__v`, and drops sensitive fields (e.g. `passwordHash`). Money math is centralized in `utils/money.ts` (`round2`, `clamp`).
 
 ### Labels / barcodes
-`services/labelPdf.ts` (pdfkit + bwip-js, Code-128) renders either an **A4 sheet (12-up)** or a **50×25 mm thermal roll (one label/page)**. The tag's price is **obfuscated** via `utils/priceCode.ts` (`encodePrice`). Label items are built by the shared `buildLabelItems` helper in `products.routes.ts`, used by both `GET /api/products/:id/labels` (one product) and `GET /api/products/labels` (bulk/filtered).
+`services/labelPdf.ts` (pdfkit + bwip-js, Code-128) renders either an **A4 sheet (12-up)** or a **50×25 mm thermal roll (one label/page)**. The tag price prints as `<prefix>-<B2B>-<B2C>` (e.g. `10082327-450-855`; prefix = `env.priceCode.tagPrefix` / `PRICE_CODE_TAG_PREFIX`). Label items are built by the shared `buildLabelItems` helper in `products.routes.ts`, used by both `GET /api/products/:id/labels` (one product) and `GET /api/products/labels` (bulk/filtered).
 
 ### Online store (`backend/src/routes/store/`, under `/api/store`)
 Public catalog (`products.routes.ts` — exposes only customer-safe fields and the **B2C price**, never cost/B2B/supplier), customer accounts (`auth.routes.ts` — register/login/me, stitches anonymous journey on signup), and journey analytics (`StoreEvent` model + `events.routes.ts` ingest; owner views a customer's journey via `GET /api/customers/:id/journey`). First-party only — nothing is sent to third-party analytics.
@@ -83,4 +83,4 @@ Public catalog (`products.routes.ts` — exposes only customer-safe fields and t
 - Keep the `{ data }` / `{ data, meta }` envelope and the list-vs-single `.data` / `.data.data` read split consistent when adding endpoints/hooks.
 - New stock-affecting operations must go through `services/stock.ts`, not ad-hoc `$inc`.
 - New per-entity list endpoints should reuse `paginationSchema` + `paginate` + `buildMeta`.
-- Prices on tags stay obfuscated via `encodePrice`; the catalog/customer price is `b2cPrice` (falling back to `sellingPrice`).
+- Tag price format is `<prefix>-<B2B>-<B2C>` (`buildLabelItems`); the catalog/customer price is `b2cPrice` (falling back to `sellingPrice`).

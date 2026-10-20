@@ -103,6 +103,14 @@ export interface SizeGroup {
   updatedAt: string;
 }
 
+export interface Color {
+  _id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Supplier {
   _id: string;
   name: string;

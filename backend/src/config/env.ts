@@ -58,6 +58,8 @@ const schema = z.object({
   PRICE_CODE_PAD: z.coerce.number().int().min(0).max(8).default(4),
   // Optional: pin the year (2-or-4 digit) instead of using the current year.
   PRICE_CODE_YEAR: z.coerce.number().int().optional(),
+  // Fixed prefix for the printed tag price, formatted as: <prefix>-<B2B>-<B2C> (e.g. 10082327-450-855).
+  PRICE_CODE_TAG_PREFIX: z.string().default('10082327'),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -112,6 +114,7 @@ export const env = {
     suffix: raw.PRICE_CODE_SUFFIX,
     pad: raw.PRICE_CODE_PAD,
     year: raw.PRICE_CODE_YEAR,
+    tagPrefix: raw.PRICE_CODE_TAG_PREFIX,
   },
 };
 

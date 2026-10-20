@@ -18,6 +18,7 @@ import { logger } from '../utils/logger';
 import { User, type UserDoc } from '../models/User';
 import { Supplier } from '../models/Supplier';
 import { SizeGroup } from '../models/SizeGroup';
+import { Color } from '../models/Color';
 import { Customer } from '../models/Customer';
 import { Product, type ProductDoc } from '../models/Product';
 import { Invoice } from '../models/Invoice';
@@ -90,8 +91,17 @@ async function run() {
       Purchase.deleteMany({}),
       Counter.deleteMany({}),
       SizeGroup.deleteMany({}),
+      Color.deleteMany({}),
     ]);
   }
+
+  // ── Colours ──────────────────────────────────────────────────────────────
+  // Picker options for product variants. Upserted (idempotent) so re-seeding keeps them.
+  const DEFAULT_COLORS = ['Red', 'Blue', 'Green', 'Black', 'White', 'Yellow', 'Pink', 'Maroon', 'Navy', 'Grey', 'Orange', 'Purple', 'Beige', 'Brown', 'Mustard'];
+  for (const name of DEFAULT_COLORS) {
+    await Color.updateOne({ name }, { $setOnInsert: { name } }, { upsert: true });
+  }
+  logger.info(`Ensured ${DEFAULT_COLORS.length} colours.`);
 
   // ── Size groups ──────────────────────────────────────────────────────────
   // Ratio-set templates used by the product grid. Upserted (idempotent) so re-running
