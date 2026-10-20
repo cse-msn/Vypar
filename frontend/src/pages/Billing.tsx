@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2, Minus, ShoppingCart, WifiOff, ScanLine, Camera } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, Trash2, Minus, ShoppingCart, WifiOff, ScanLine, Camera, FileClock } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { CustomerPicker } from '@/components/CustomerPicker';
@@ -12,10 +12,11 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/EmptyState';
 import { Spinner } from '@/components/ui/spinner';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCreateInvoice } from '@/hooks/invoices';
 import { lookupProduct } from '@/hooks/products';
-import { fetchDraft, saveDraft, deleteDraft } from '@/hooks/drafts';
+import { fetchDraft, saveDraft, deleteDraft, useDrafts } from '@/hooks/drafts';
 import { useOnline } from '@/hooks/useOnline';
 import { getApiError } from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
@@ -52,6 +53,8 @@ const newKey = () => `${Date.now()}-${Math.round(performance.now())}`;
 export default function Billing() {
   const online = useOnline();
   const create = useCreateInvoice();
+  const { data: drafts } = useDrafts();
+  const qc = useQueryClient();
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
@@ -122,31 +125,35 @@ export default function Billing() {
     })();
   }, [searchParams, setSearchParams]);
 
-  // Auto-save the in-progress bill to a draft every 2 minutes (and when leaving the page),
-  // until it is finalised via Save & Share (which deletes the draft).
+  // Persist the whole bill to a draft (create once, then update) — on every change
+  // and when leaving the page — until it's finalised via Save & Share (which deletes the draft).
+  const persistDraft = useCallback(async () => {
+    const s = latestRef.current;
+    if (!s || s.data.lines.length === 0) return; // never store an empty bill
+    const isNew = !draftIdRef.current;
+    try {
+      const draft = await saveDraft({
+        id: draftIdRef.current,
+        data: s.data,
+        customerName: s.data.customer?.name || 'Walk-in Customer',
+        itemCount: s.data.lines.length,
+        total: s.total,
+      });
+      draftIdRef.current = draft._id;
+      if (isNew) qc.invalidateQueries({ queryKey: ['drafts'] }); // show it in the list/count
+    } catch {
+      /* ignore save failures — the next change will retry */
+    }
+  }, [qc]);
+
+  // Save shortly after any change to the bill (debounced so typing doesn't spam the server).
   useEffect(() => {
-    const save = async () => {
-      const s = latestRef.current;
-      if (!s || s.data.lines.length === 0) return;
-      try {
-        const draft = await saveDraft({
-          id: draftIdRef.current,
-          data: s.data,
-          customerName: s.data.customer?.name || 'Walk-in Customer',
-          itemCount: s.data.lines.length,
-          total: s.total,
-        });
-        draftIdRef.current = draft._id;
-      } catch {
-        /* ignore auto-save failures — we'll try again on the next tick */
-      }
-    };
-    const timer = setInterval(save, 2 * 60 * 1000);
-    return () => {
-      clearInterval(timer);
-      void save(); // capture the latest state when navigating away (SPA keeps running)
-    };
-  }, []);
+    const t = setTimeout(() => void persistDraft(), 800);
+    return () => clearTimeout(t);
+  }, [customer, lines, discountPercent, taxPercent, roundOff, amountPaid, paymentMethod, notes, persistDraft]);
+
+  // Flush the latest state when navigating away (the SPA keeps running, so the request completes).
+  useEffect(() => () => void persistDraft(), [persistDraft]);
 
   const addLine = (product: Product, variant: Variant) => {
     setLines((prev) => {
@@ -243,6 +250,7 @@ export default function Billing() {
       if (draftIdRef.current) {
         void deleteDraft(draftIdRef.current).catch(() => undefined);
         draftIdRef.current = null;
+        qc.invalidateQueries({ queryKey: ['drafts'] });
       }
       reset();
     } catch (err) {
@@ -257,7 +265,17 @@ export default function Billing() {
 
   return (
     <div className="pb-28">
-      <PageHeader title="New Bill" subtitle="Add items, pick a customer, and charge." />
+      <PageHeader
+        title="New Bill"
+        subtitle="Add items, pick a customer, and charge."
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/drafts">
+              <FileClock className="h-4 w-4" /> Drafts{drafts?.length ? ` (${drafts.length})` : ''}
+            </Link>
+          </Button>
+        }
+      />
 
       {!online && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning">
