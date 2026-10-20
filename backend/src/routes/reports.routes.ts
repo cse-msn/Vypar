@@ -99,7 +99,7 @@ router.get(
     const match: Record<string, unknown> = { status: 'confirmed' };
     if (from || to) match.date = { ...(from && { $gte: from }), ...(to && { $lte: to }) };
 
-    const [summary, daily, topProducts] = await Promise.all([
+    const [summary, daily, topProducts, byMethod] = await Promise.all([
       Invoice.aggregate([
         { $match: match },
         {
@@ -146,6 +146,18 @@ router.get(
           },
         },
       ]),
+      Invoice.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$paymentMethod',
+            total: { $sum: '$total' },
+            collected: { $sum: '$amountPaid' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { total: -1 } },
+      ]),
     ]);
 
     const s = summary[0] ?? {};
@@ -160,6 +172,12 @@ router.get(
         },
         daily: daily.map((d) => ({ date: d._id, total: round2(d.total), count: d.count })),
         topProducts,
+        byMethod: byMethod.map((m) => ({
+          method: m._id ?? 'other',
+          total: round2(m.total),
+          collected: round2(m.collected),
+          count: m.count,
+        })),
       },
     });
   }),

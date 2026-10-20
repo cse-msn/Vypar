@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWra
 import { Spinner } from '@/components/ui/spinner';
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useCustomerLedger } from '@/hooks/customers';
 import { getApiError } from '@/lib/api';
-import { formatCurrency, formatDate } from '@/lib/format';
+import { formatCurrency, formatDate, paymentMethodLabel } from '@/lib/format';
 import type { Customer } from '@/types';
 
 export default function Customers() {
@@ -220,7 +220,7 @@ function LedgerDialog({ customer, onClose }: { customer: Customer; onClose: () =
                 <ul className="divide-y text-sm">
                   {data.payments.map((p) => (
                     <li key={p._id} className="flex justify-between py-1.5">
-                      <span>{p.paymentNumber} <span className="text-muted-foreground">· {formatDate(p.date)} · {p.method}</span></span>
+                      <span>{p.paymentNumber} <span className="text-muted-foreground">· {formatDate(p.date)} · {paymentMethodLabel(p.method)}</span></span>
                       <span className="text-success">{formatCurrency(p.amount)}</span>
                     </li>
                   ))}

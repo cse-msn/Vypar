@@ -20,3 +20,15 @@ export const formatDateTime = (d: string | Date | undefined | null) =>
 
 export const fromNow = (d: string | Date | undefined | null) =>
   d ? formatDistanceToNow(new Date(d), { addSuffix: true }) : '';
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  upi: 'UPI',
+  bank: 'Bank',
+  credit: 'Credit (pay later)',
+  other: 'Other',
+};
+
+/** Friendly label for a payment method (e.g. "credit" → "Credit (pay later)"). */
+export const paymentMethodLabel = (m?: string | null) => (m ? PAYMENT_METHOD_LABELS[m] ?? m : '—');

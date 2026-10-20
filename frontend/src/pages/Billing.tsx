@@ -221,6 +221,19 @@ export default function Billing() {
     idemKey.current = crypto.randomUUID();
   };
 
+  // Credit = pay later → nothing paid now (full amount becomes Balance due).
+  // Leaving credit → assume paid in full again.
+  const onMethodChange = (m: PaymentMethod) => {
+    if (m === 'credit') {
+      paidTouched.current = true;
+      setAmountPaid(0);
+    } else if (paymentMethod === 'credit') {
+      paidTouched.current = false;
+      setAmountPaid(total);
+    }
+    setPaymentMethod(m);
+  };
+
   const overStock = lines.find((l) => l.quantity > l.variant.quantity);
 
   const submit = async () => {
@@ -436,14 +449,14 @@ export default function Billing() {
                 </div>
                 <div>
                   <Label htmlFor="method">Method</Label>
-                  <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
+                  <Select value={paymentMethod} onValueChange={(v) => onMethodChange(v as PaymentMethod)}>
                     <SelectTrigger id="method"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="upi">UPI</SelectItem>
                       <SelectItem value="card">Card</SelectItem>
                       <SelectItem value="bank">Bank</SelectItem>
-                      <SelectItem value="credit">Credit</SelectItem>
+                      <SelectItem value="credit">Credit (pay later)</SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>

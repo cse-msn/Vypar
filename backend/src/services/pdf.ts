@@ -41,6 +41,15 @@ const inr = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFr
 const money = (n: number) => inr.format(n ?? 0);
 const qty = (n: number) => (Number.isInteger(n) ? String(n) : String(n));
 const ddmmyyyy = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  upi: 'UPI',
+  bank: 'Bank',
+  credit: 'Credit (pay later)',
+  other: 'Other',
+};
+const methodLabel = (m: string) => PAYMENT_METHOD_LABELS[m] ?? m.toUpperCase();
 
 const DARK = '#111111';
 const GREY = '#555555';
@@ -131,7 +140,7 @@ export function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
       };
       cell(mx, top, 'Invoice No.', data.invoiceNumber);
       cell(mx + half, top, 'Dated', ddmmyyyy(data.date));
-      cell(mx, top + rowsH, 'Payment Mode', data.paymentMethod.toUpperCase());
+      cell(mx, top + rowsH, 'Payment Mode', methodLabel(data.paymentMethod));
       cell(mx + half, top + rowsH, 'Status', data.paymentStatus.toUpperCase());
       cell(mx, top + rowsH * 2, 'Amount Paid', money(data.amountPaid));
       cell(mx + half, top + rowsH * 2, 'Balance', money(data.balance));

@@ -25,7 +25,7 @@ import {
 import { useSuppliers } from '@/hooks/suppliers';
 import { openPdf } from '@/lib/pdf';
 import { getApiError } from '@/lib/api';
-import { formatCurrency, formatNumber } from '@/lib/format';
+import { formatCurrency, formatNumber, paymentMethodLabel } from '@/lib/format';
 
 type Tab = 'sales' | 'inventory' | 'financial' | 'supplier' | 'stocklist';
 const TAB_LABELS: Record<Tab, string> = {
@@ -287,6 +287,38 @@ function SalesTab({ range }: { range: { from?: string; to?: string } }) {
                 <Bar dataKey="total" fill={PRIMARY} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">By payment method</CardTitle></CardHeader>
+        <CardContent>
+          {data.byMethod.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No data.</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Method</TableHead>
+                    <TableHead className="text-right">Bills</TableHead>
+                    <TableHead className="text-right">Sales</TableHead>
+                    <TableHead className="text-right">Collected</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.byMethod.map((m) => (
+                    <TableRow key={m.method}>
+                      <TableCell className="font-medium">{paymentMethodLabel(m.method)}</TableCell>
+                      <TableCell className="text-right">{m.count}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(m.total)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(m.collected)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrap>
           )}
         </CardContent>
       </Card>

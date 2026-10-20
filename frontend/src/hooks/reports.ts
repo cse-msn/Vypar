@@ -16,6 +16,7 @@ export interface SalesReport {
   summary: { totalSales: number; totalCollected: number; totalOutstanding: number; invoiceCount: number; unitsSold: number };
   daily: { date: string; total: number; count: number }[];
   topProducts: { designNumber: string; productName: string; quantity: number; amount: number }[];
+  byMethod: { method: string; total: number; collected: number; count: number }[];
 }
 
 export function useSalesReport(params: { from?: string; to?: string } = {}) {

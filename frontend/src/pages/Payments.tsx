@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableWrap } from '@/components/ui/table';
 import { usePayments } from '@/hooks/payments';
-import { formatCurrency, formatDate } from '@/lib/format';
+import { formatCurrency, formatDate, paymentMethodLabel } from '@/lib/format';
 import type { Customer, Payment } from '@/types';
 
 const custName = (p: Payment) => (typeof p.customer === 'object' && p.customer ? p.customer.name : '—');
@@ -67,7 +67,7 @@ export default function Payments() {
                   <TableCell className="text-muted-foreground">{formatDate(p.date)}</TableCell>
                   <TableCell>{custName(p)}</TableCell>
                   <TableCell className="text-muted-foreground">{invNo(p) ?? 'On account'}</TableCell>
-                  <TableCell><Badge variant="secondary">{p.method}</Badge></TableCell>
+                  <TableCell><Badge variant="secondary">{paymentMethodLabel(p.method)}</Badge></TableCell>
                   <TableCell className="text-right font-semibold text-success">{formatCurrency(p.amount)}</TableCell>
                 </TableRow>
               ))}
