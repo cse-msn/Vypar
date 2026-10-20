@@ -106,6 +106,7 @@ function CustomerFormDialog({ customer, onClose }: { customer: Customer | null; 
     name: customer?.name ?? '',
     phone: customer?.phone ?? '',
     whatsapp: customer?.whatsapp ?? '',
+    altPhone: customer?.altPhone ?? '',
     email: customer?.email ?? '',
     gstin: customer?.gstin ?? '',
     address: customer?.address ?? '',
@@ -117,6 +118,7 @@ function CustomerFormDialog({ customer, onClose }: { customer: Customer | null; 
       name: form.name.trim(),
       phone: form.phone.trim() || undefined,
       whatsapp: form.whatsapp.trim() || undefined,
+      altPhone: form.altPhone.trim() || undefined,
       email: form.email.trim() || undefined,
       gstin: form.gstin.trim() || undefined,
       address: form.address.trim() || undefined,
@@ -151,6 +153,10 @@ function CustomerFormDialog({ customer, onClose }: { customer: Customer | null; 
           <div>
             <Label>WhatsApp</Label>
             <Input inputMode="tel" placeholder="Defaults to phone" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+          </div>
+          <div>
+            <Label>Alternate number</Label>
+            <Input inputMode="tel" placeholder="optional" value={form.altPhone} onChange={(e) => setForm({ ...form, altPhone: e.target.value })} />
           </div>
           <div>
             <Label>Email</Label>

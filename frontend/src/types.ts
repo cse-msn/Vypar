@@ -83,6 +83,7 @@ export interface Customer {
   name: string;
   phone?: string;
   whatsapp?: string;
+  altPhone?: string;
   email?: string;
   gstin?: string;
   address?: string;
@@ -200,6 +201,17 @@ export interface Purchase {
 export interface Paginated<T> {
   data: T[];
   meta: { total: number; page: number; limit: number; pages: number; hasMore: boolean };
+}
+
+/** A saved, not-yet-finalised bill. `data` is an opaque Billing-screen snapshot. */
+export interface Draft {
+  _id: string;
+  data: unknown;
+  customerName: string;
+  itemCount: number;
+  total: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface InvoiceShare {

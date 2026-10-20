@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingCart,
+  FileClock,
   Package,
   ScanLine,
   ReceiptText,
@@ -35,6 +36,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/billing', label: 'New Bill', icon: ShoppingCart },
+  { to: '/drafts', label: 'Drafts', icon: FileClock },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/stock', label: 'Stock Lookup', icon: ScanLine },
   { to: '/invoices', label: 'Invoices', icon: ReceiptText },

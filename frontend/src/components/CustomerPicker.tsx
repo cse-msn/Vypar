@@ -6,6 +6,7 @@ import { getApiError } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import type { Customer } from '@/types';
@@ -24,6 +25,9 @@ export function CustomerPicker({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [altPhone, setAltPhone] = useState('');
+  const [gstin, setGstin] = useState('');
+  const [address, setAddress] = useState('');
   const { data, isLoading } = useCustomers({ search, limit: 20 });
   const createCustomer = useCreateCustomer();
 
@@ -35,10 +39,19 @@ export function CustomerPicker({
   const add = async () => {
     if (!name.trim()) return toast.error('Enter a customer name');
     try {
-      const c = await createCustomer.mutateAsync({ name: name.trim(), phone: phone.trim() || undefined });
+      const c = await createCustomer.mutateAsync({
+        name: name.trim(),
+        phone: phone.trim() || undefined,
+        altPhone: altPhone.trim() || undefined,
+        gstin: gstin.trim() || undefined,
+        address: address.trim() || undefined,
+      });
       toast.success('Customer added');
       setName('');
       setPhone('');
+      setAltPhone('');
+      setGstin('');
+      setAddress('');
       setAdding(false);
       pick(c);
     } catch (err) {
@@ -123,14 +136,26 @@ export function CustomerPicker({
               </Button>
             </>
           ) : (
-            <div className="space-y-3">
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
               <div>
-                <Label>Name *</Label>
+                <Label>Full name *</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" autoFocus />
               </div>
               <div>
-                <Label>Phone / WhatsApp</Label>
+                <Label>Contact number</Label>
                 <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="10-digit number" inputMode="tel" />
+              </div>
+              <div>
+                <Label>Alternate number (optional)</Label>
+                <Input value={altPhone} onChange={(e) => setAltPhone(e.target.value)} placeholder="optional second number" inputMode="tel" />
+              </div>
+              <div>
+                <Label>GST number</Label>
+                <Input value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="e.g. 27ABCDE1234F1Z5" />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Textarea value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Customer address" rows={2} />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setAdding(false)}>

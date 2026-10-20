@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { LabelDialog } from '@/components/LabelDialog';
 import { BulkLabelDialog } from '@/components/BulkLabelDialog';
+import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
 import { Pagination } from '@/components/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export default function Products() {
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [labelFor, setLabelFor] = useState<Product | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [detailsFor, setDetailsFor] = useState<Product | null>(null);
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -88,15 +90,20 @@ export default function Products() {
                 <Card key={p._id}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setDetailsFor(p)}
+                        className="flex min-w-0 items-center gap-3 text-left"
+                        aria-label={`View details for ${p.designNumber}`}
+                      >
                         {(p.images?.[0] || p.imageUrl) && (
                           <img src={p.images?.[0] || p.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-md border object-cover" />
                         )}
                         <div className="min-w-0">
-                          <p className="font-semibold">{p.designNumber}</p>
+                          <p className="font-semibold hover:text-primary">{p.designNumber}</p>
                           <p className="truncate text-sm text-muted-foreground">{p.name}</p>
                         </div>
-                      </div>
+                      </button>
                       <div className="flex shrink-0 gap-1">
                         <Button variant="ghost" size="icon" aria-label="Print labels" onClick={() => setLabelFor(p)}>
                           <QrCode className="h-4 w-4" />
@@ -141,6 +148,10 @@ export default function Products() {
 
       {labelFor && (
         <LabelDialog product={labelFor} open={!!labelFor} onOpenChange={(v) => !v && setLabelFor(null)} />
+      )}
+
+      {detailsFor && (
+        <ProductDetailsDialog product={detailsFor} open={!!detailsFor} onOpenChange={(v) => !v && setDetailsFor(null)} />
       )}
 
       <BulkLabelDialog search={search} open={bulkOpen} onOpenChange={setBulkOpen} />

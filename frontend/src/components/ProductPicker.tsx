@@ -85,6 +85,9 @@ export function ProductPicker({
                   <div className="min-w-0">
                     <span className="font-semibold">{product.designNumber}</span>
                     <span className="ml-2 text-sm text-muted-foreground">{product.name}</span>
+                    {product.code != null && (
+                      <span className="ml-2 text-xs text-muted-foreground">· Code {product.code}</span>
+                    )}
                   </div>
                   <span className="shrink-0 text-sm font-medium">{formatCurrency(product.sellingPrice)}</span>
                 </div>

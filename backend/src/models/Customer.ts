@@ -8,6 +8,8 @@ export interface ICustomer {
   phone?: string;
   /** WhatsApp number; falls back to `phone` when empty. Digits + optional country code. */
   whatsapp?: string;
+  /** Optional secondary / alternate contact number. */
+  altPhone?: string;
   email?: string;
   gstin?: string;
   address?: string;
@@ -36,6 +38,7 @@ const customerSchema = new Schema<ICustomer, CustomerModel, ICustomerMethods>(
     name: { type: String, required: true, trim: true, index: true },
     phone: { type: String, trim: true, index: true },
     whatsapp: { type: String, trim: true },
+    altPhone: { type: String, trim: true },
     email: { type: String, trim: true, lowercase: true },
     gstin: { type: String, trim: true, uppercase: true },
     address: { type: String, trim: true },

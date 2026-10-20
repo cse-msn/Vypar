@@ -12,8 +12,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/EmptyState';
 import { Spinner } from '@/components/ui/spinner';
+import { useSearchParams } from 'react-router-dom';
 import { useCreateInvoice } from '@/hooks/invoices';
 import { lookupProduct } from '@/hooks/products';
+import { fetchDraft, saveDraft, deleteDraft } from '@/hooks/drafts';
 import { useOnline } from '@/hooks/useOnline';
 import { getApiError } from '@/lib/api';
 import { formatCurrency } from '@/lib/format';
@@ -32,6 +34,18 @@ interface Line {
   price: number;
 }
 
+/** Snapshot of the Billing screen stored in a draft. */
+interface DraftData {
+  customer: Customer | null;
+  lines: Line[];
+  discountPercent: number;
+  taxPercent: number;
+  roundOff: boolean;
+  amountPaid: number;
+  paymentMethod: PaymentMethod;
+  notes: string;
+}
+
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const newKey = () => `${Date.now()}-${Math.round(performance.now())}`;
 
@@ -42,7 +56,7 @@ export default function Billing() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [discountAmount, setDiscountAmount] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [taxPercent, setTaxPercent] = useState(0);
   const [roundOff, setRoundOff] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -54,19 +68,85 @@ export default function Billing() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scanCode, setScanCode] = useState('');
   const scanRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const draftIdRef = useRef<string | null>(null);
+  const draftLoadedRef = useRef(false);
+  const latestRef = useRef<{ data: DraftData; total: number } | null>(null);
 
   const subtotal = useMemo(() => round2(lines.reduce((s, l) => s + l.price * l.quantity, 0)), [lines]);
-  const discount = Math.min(discountAmount || 0, subtotal);
+  const discount = round2((subtotal * Math.min(discountPercent || 0, 100)) / 100);
   const taxable = round2(subtotal - discount);
   const taxAmount = round2((taxable * (taxPercent || 0)) / 100);
   let total = round2(taxable + taxAmount);
   if (roundOff) total = Math.round(total);
   const balance = round2(total - (amountPaid || 0));
 
+  // Keep the newest state handy for the auto-save interval (which closes over refs, not state).
+  latestRef.current = {
+    data: { customer, lines, discountPercent, taxPercent, roundOff, amountPaid, paymentMethod, notes },
+    total,
+  };
+
   // Default "amount paid" to the full total until the user edits it.
   useEffect(() => {
     if (!paidTouched.current) setAmountPaid(total);
   }, [total]);
+
+  // Open an existing draft when arriving via /billing?draft=<id> (once).
+  useEffect(() => {
+    const id = searchParams.get('draft');
+    if (!id || draftLoadedRef.current) return;
+    draftLoadedRef.current = true;
+    (async () => {
+      try {
+        const draft = await fetchDraft(id);
+        const d = draft.data as Partial<DraftData> | null;
+        if (d) {
+          setCustomer(d.customer ?? null);
+          setLines(Array.isArray(d.lines) ? d.lines : []);
+          setDiscountPercent(d.discountPercent ?? 0);
+          setTaxPercent(d.taxPercent ?? 0);
+          setRoundOff(Boolean(d.roundOff));
+          setAmountPaid(d.amountPaid ?? 0);
+          setPaymentMethod(d.paymentMethod ?? 'cash');
+          setNotes(d.notes ?? '');
+          paidTouched.current = true; // keep the draft's amount instead of re-defaulting
+        }
+        draftIdRef.current = id;
+        toast.message('Draft opened', { description: 'Continue, then Save & Share to finalise.' });
+      } catch {
+        toast.error('Could not open that draft');
+      } finally {
+        setSearchParams({}, { replace: true }); // clean the URL so a refresh doesn't reload it
+      }
+    })();
+  }, [searchParams, setSearchParams]);
+
+  // Auto-save the in-progress bill to a draft every 2 minutes (and when leaving the page),
+  // until it is finalised via Save & Share (which deletes the draft).
+  useEffect(() => {
+    const save = async () => {
+      const s = latestRef.current;
+      if (!s || s.data.lines.length === 0) return;
+      try {
+        const draft = await saveDraft({
+          id: draftIdRef.current,
+          data: s.data,
+          customerName: s.data.customer?.name || 'Walk-in Customer',
+          itemCount: s.data.lines.length,
+          total: s.total,
+        });
+        draftIdRef.current = draft._id;
+      } catch {
+        /* ignore auto-save failures — we'll try again on the next tick */
+      }
+    };
+    const timer = setInterval(save, 2 * 60 * 1000);
+    return () => {
+      clearInterval(timer);
+      void save(); // capture the latest state when navigating away (SPA keeps running)
+    };
+  }, []);
 
   const addLine = (product: Product, variant: Variant) => {
     setLines((prev) => {
@@ -124,7 +204,7 @@ export default function Billing() {
   const reset = () => {
     setCustomer(null);
     setLines([]);
-    setDiscountAmount(0);
+    setDiscountPercent(0);
     setTaxPercent(0);
     setRoundOff(false);
     setAmountPaid(0);
@@ -150,7 +230,7 @@ export default function Billing() {
         customerId: customer?._id,
         customerName: customer ? undefined : 'Walk-in Customer',
         items: lines.map((l) => ({ productId: l.product._id, variantId: l.variant._id, quantity: l.quantity, price: l.price })),
-        discountAmount: discount || undefined,
+        discountPercent: discountPercent || undefined,
         taxPercent: taxPercent || undefined,
         roundOff,
         amountPaid: amountPaid || 0,
@@ -159,6 +239,11 @@ export default function Billing() {
       });
       toast.success(`Invoice ${res.data.invoiceNumber} saved`);
       setShareFor({ id: res.data._id, number: res.data.invoiceNumber });
+      // The bill is finalised — drop its draft so it won't linger.
+      if (draftIdRef.current) {
+        void deleteDraft(draftIdRef.current).catch(() => undefined);
+        draftIdRef.current = null;
+      }
       reset();
     } catch (err) {
       const e = getApiError(err);
@@ -294,8 +379,8 @@ export default function Billing() {
             <CardContent className="space-y-3 p-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="disc">Discount ₹</Label>
-                  <Input id="disc" inputMode="decimal" value={discountAmount || ''} onChange={(e) => setDiscountAmount(Number(e.target.value) || 0)} />
+                  <Label htmlFor="disc">Discount %</Label>
+                  <Input id="disc" inputMode="decimal" value={discountPercent || ''} onChange={(e) => setDiscountPercent(Math.min(100, Number(e.target.value) || 0))} />
                 </div>
                 <div>
                   <Label htmlFor="tax">Tax %</Label>
@@ -310,7 +395,7 @@ export default function Billing() {
 
               <div className="space-y-1.5 border-t pt-3 text-sm">
                 <Row label="Subtotal" value={formatCurrency(subtotal)} />
-                {discount > 0 && <Row label="Discount" value={`- ${formatCurrency(discount)}`} />}
+                {discount > 0 && <Row label={`Discount (${discountPercent}%)`} value={`- ${formatCurrency(discount)}`} />}
                 {taxAmount > 0 && <Row label={`Tax (${taxPercent}%)`} value={formatCurrency(taxAmount)} />}
                 <div className="flex items-end justify-between border-t pt-3">
                   <span className="text-sm font-medium text-muted-foreground">Total</span>

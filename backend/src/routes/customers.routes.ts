@@ -19,6 +19,7 @@ const customerInput = z.object({
   name: z.string().trim().min(1),
   phone: z.string().trim().optional(),
   whatsapp: z.string().trim().optional(),
+  altPhone: z.string().trim().optional(),
   email: z.string().trim().email().optional().or(z.literal('')),
   gstin: z.string().trim().optional(),
   address: z.string().trim().optional(),
