@@ -191,7 +191,7 @@ function EditShopDialog({ shop, onClose }: { shop: ShopDetails; onClose: () => v
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-xl">
         <DialogHeader><DialogTitle>Edit shop details</DialogTitle></DialogHeader>
-        <div className="grid max-h-[65vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+        <div className="grid max-h-[65vh] gap-3 overflow-y-auto p-1.5 sm:grid-cols-2">
           <div className="sm:col-span-2"><Label>Shop name *</Label><Input value={form.name} onChange={set('name')} autoFocus /></div>
           <div><Label>Phone</Label><Input inputMode="tel" value={form.phone} onChange={set('phone')} /></div>
           <div><Label>Email</Label><Input type="email" value={form.email} onChange={set('email')} /></div>

@@ -27,7 +27,7 @@ const persister = createSyncStoragePersister({
 export const persistOptions: Omit<PersistQueryClientOptions, 'queryClient'> = {
   persister,
   maxAge: 1000 * 60 * 60 * 24, // show cached data up to 24h old when offline
-  buster: 'v1',
+  buster: 'v2', // bump when a cached query's shape changes, to drop stale persisted data
   dehydrateOptions: {
     // Only persist successful reads; never persist pending/paused mutations.
     shouldDehydrateQuery: (q) => q.state.status === 'success',

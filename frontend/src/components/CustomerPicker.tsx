@@ -136,7 +136,7 @@ export function CustomerPicker({
               </Button>
             </>
           ) : (
-            <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto p-1.5">
               <div>
                 <Label>Full name *</Label>
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" autoFocus />

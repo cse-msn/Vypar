@@ -262,7 +262,8 @@ function SupplierStockTab({ range }: { range: { from?: string; to?: string } }) 
 function SalesTab({ range }: { range: { from?: string; to?: string } }) {
   const { data, isLoading } = useSalesReport(range);
   if (isLoading || !data) return <Skeleton className="h-64" />;
-  const chart = data.daily.map((d) => ({ date: d.date.slice(5), total: d.total }));
+  const chart = (data.daily ?? []).map((d) => ({ date: d.date.slice(5), total: d.total }));
+  const byMethod = data.byMethod ?? []; // guard: persisted cache may predate this field
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -294,7 +295,7 @@ function SalesTab({ range }: { range: { from?: string; to?: string } }) {
       <Card>
         <CardHeader><CardTitle className="text-base">By payment method</CardTitle></CardHeader>
         <CardContent>
-          {data.byMethod.length === 0 ? (
+          {byMethod.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No data.</p>
           ) : (
             <TableWrap>
@@ -308,7 +309,7 @@ function SalesTab({ range }: { range: { from?: string; to?: string } }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.byMethod.map((m) => (
+                  {byMethod.map((m) => (
                     <TableRow key={m.method}>
                       <TableCell className="font-medium">{paymentMethodLabel(m.method)}</TableCell>
                       <TableCell className="text-right">{m.count}</TableCell>
