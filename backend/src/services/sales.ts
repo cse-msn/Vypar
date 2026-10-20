@@ -5,6 +5,7 @@ import { nextSequence, formatNumber } from '../models/Counter';
 import { reserveStock, releaseStock, type StockLine } from './stock';
 import { recordPayment } from './payments';
 import { generateInvoicePdf, type InvoicePdfData } from './pdf';
+import { getShopProfile } from './shopProfile';
 import { getStorage, invoicePdfKey } from './storage';
 import { ApiError } from '../utils/ApiError';
 import { round2, clamp } from '../utils/money';
@@ -284,6 +285,7 @@ export async function ensureInvoicePdf(invoice: InvoiceDoc, force = false): Prom
     balance: invoice.balance,
     paymentMethod: invoice.paymentMethod,
     paymentStatus: invoice.paymentStatus,
+    shop: await getShopProfile(),
   };
 
   const buffer = await generateInvoicePdf(data);

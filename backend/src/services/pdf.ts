@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { env } from '../config/env';
 import { rupeesInWords } from '../utils/numberToWords';
+import type { ShopProfileShape } from './shopProfile';
 
 export interface InvoicePdfItem {
   designNumber: string;
@@ -35,6 +36,8 @@ export interface InvoicePdfData {
   balance: number;
   paymentMethod: string;
   paymentStatus: string;
+  /** Seller/shop details; falls back to config defaults when omitted. */
+  shop?: ShopProfileShape;
 }
 
 const inr = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -64,7 +67,7 @@ export function generateInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const s = env.shop;
+    const s = data.shop ?? env.shop;
     const pageW = doc.page.width;
     const pageH = doc.page.height;
     const left = 24;

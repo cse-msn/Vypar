@@ -122,7 +122,16 @@ router.get(
     // Authenticated financial document — never cache in shared/public caches.
     res.setHeader('Cache-Control', 'private, no-store');
     const disposition = req.query.download ? 'attachment' : 'inline';
-    res.setHeader('Content-Disposition', `${disposition}; filename="${invoice.invoiceNumber}.pdf"`);
+    // Filename: <customer>_<bill no>_<date>_<time>.pdf
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dt = new Date(invoice.date ?? invoice.createdAt);
+    const stamp = `${pad(dt.getDate())}-${pad(dt.getMonth() + 1)}-${dt.getFullYear()}_${pad(dt.getHours())}-${pad(dt.getMinutes())}`;
+    const safe = (s?: string) => (s || '').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '-').slice(0, 50) || 'Walk-in';
+    const filename = `${safe(invoice.customerSnapshot.name)}_${invoice.invoiceNumber}_${stamp}.pdf`;
+    res.setHeader(
+      'Content-Disposition',
+      `${disposition}; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    );
     res.send(buffer);
   }),
 );

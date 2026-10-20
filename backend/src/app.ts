@@ -33,6 +33,8 @@ export function createApp() {
         callback(new Error(`Origin not allowed by CORS: ${origin}`));
       },
       credentials: true,
+      // Let the browser read the download filename we set on PDF responses.
+      exposedHeaders: ['Content-Disposition'],
     }),
   );
 

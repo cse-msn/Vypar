@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserCog, ShieldCheck, Ruler, Pencil, Trash2 } from 'lucide-react';
+import { Plus, UserCog, ShieldCheck, Ruler, Pencil, Trash2, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,16 @@ import { api, getApiError } from '@/lib/api';
 import { qk } from '@/lib/queryKeys';
 import { useAuth } from '@/context/AuthContext';
 import { useSizeGroups, useCreateSizeGroup, useUpdateSizeGroup, useDeleteSizeGroup } from '@/hooks/sizeGroups';
-import type { Role, SizeGroup, User } from '@/types';
+import type { Role, ShopDetails, SizeGroup, User } from '@/types';
+
+function Field({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-sm font-medium">{value || '—'}</dd>
+    </div>
+  );
+}
 
 export default function Settings() {
   const { user: me } = useAuth();
@@ -27,6 +36,11 @@ export default function Settings() {
   });
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
+  const [editingShop, setEditingShop] = useState(false);
+  const { data: shop } = useQuery({
+    queryKey: ['shop-details'],
+    queryFn: async () => (await api.get('/settings/shop')).data.data as ShopDetails,
+  });
 
   const refresh = () => qc.invalidateQueries({ queryKey: qk.users });
 
@@ -37,6 +51,44 @@ export default function Settings() {
         subtitle="Manage staff accounts and access."
         actions={<Button onClick={() => setAdding(true)}><Plus className="h-4 w-4" /> Add user</Button>}
       />
+
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base"><Store className="h-4 w-4" /> Shop details</CardTitle>
+            {me?.role === 'owner' && shop && (
+              <Button variant="outline" size="sm" onClick={() => setEditingShop(true)}>
+                <Pencil className="h-4 w-4" /> Edit
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!shop ? (
+            <Spinner className="h-5 w-5 text-primary" />
+          ) : (
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <Field label="Shop name" value={shop.name} />
+              <Field label="Phone" value={shop.phone} />
+              <Field label="Email" value={shop.email} />
+              <Field label="GSTIN" value={shop.gstin} />
+              <Field label="State" value={shop.state ? `${shop.state}${shop.stateCode ? ` (${shop.stateCode})` : ''}` : undefined} />
+              <Field label="Default HSN" value={shop.defaultHsn} />
+              <Field label="Bank" value={shop.bank?.name} />
+              <Field label="Account no." value={shop.bank?.account} />
+              <Field label="IFSC" value={shop.bank?.ifsc} />
+              <div className="col-span-2 sm:col-span-3">
+                <dt className="text-xs text-muted-foreground">Address</dt>
+                <dd className="text-sm font-medium">{shop.address || '—'}</dd>
+              </div>
+            </dl>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Shown on invoices, tags and the customer bill.{' '}
+            {me?.role === 'owner' ? 'Use Edit to update them.' : 'Only the shop owner can change these.'}
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><UserCog className="h-4 w-4" /> Users</CardTitle></CardHeader>
@@ -87,7 +139,76 @@ export default function Settings() {
 
       {adding && <AddUserDialog onClose={() => setAdding(false)} onDone={refresh} />}
       {editing && <EditUserDialog user={editing} isSelf={editing._id === me?._id} onClose={() => setEditing(null)} onDone={refresh} />}
+      {editingShop && shop && <EditShopDialog shop={shop} onClose={() => setEditingShop(false)} />}
     </div>
+  );
+}
+
+function EditShopDialog({ shop, onClose }: { shop: ShopDetails; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: shop.name ?? '',
+    phone: shop.phone ?? '',
+    email: shop.email ?? '',
+    gstin: shop.gstin ?? '',
+    state: shop.state ?? '',
+    stateCode: shop.stateCode ?? '',
+    defaultHsn: shop.defaultHsn ?? '',
+    address: shop.address ?? '',
+    bankName: shop.bank?.name ?? '',
+    bankAccount: shop.bank?.account ?? '',
+    bankIfsc: shop.bank?.ifsc ?? '',
+  });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
+
+  const save = async () => {
+    if (!form.name.trim()) return toast.error('Shop name is required');
+    setSaving(true);
+    try {
+      await api.put('/settings/shop', {
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        gstin: form.gstin.trim(),
+        state: form.state.trim(),
+        stateCode: form.stateCode.trim(),
+        defaultHsn: form.defaultHsn.trim(),
+        address: form.address.trim(),
+        bank: { name: form.bankName.trim(), account: form.bankAccount.trim(), ifsc: form.bankIfsc.trim() },
+      });
+      toast.success('Shop details updated');
+      qc.invalidateQueries({ queryKey: ['shop-details'] });
+      onClose();
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader><DialogTitle>Edit shop details</DialogTitle></DialogHeader>
+        <div className="grid max-h-[65vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="sm:col-span-2"><Label>Shop name *</Label><Input value={form.name} onChange={set('name')} autoFocus /></div>
+          <div><Label>Phone</Label><Input inputMode="tel" value={form.phone} onChange={set('phone')} /></div>
+          <div><Label>Email</Label><Input type="email" value={form.email} onChange={set('email')} /></div>
+          <div><Label>GSTIN</Label><Input value={form.gstin} onChange={set('gstin')} /></div>
+          <div><Label>Default HSN</Label><Input value={form.defaultHsn} onChange={set('defaultHsn')} /></div>
+          <div><Label>State</Label><Input value={form.state} onChange={set('state')} /></div>
+          <div><Label>State code</Label><Input value={form.stateCode} onChange={set('stateCode')} /></div>
+          <div className="sm:col-span-2"><Label>Address</Label><Input value={form.address} onChange={set('address')} /></div>
+          <div><Label>Bank name</Label><Input value={form.bankName} onChange={set('bankName')} /></div>
+          <div><Label>Account no.</Label><Input value={form.bankAccount} onChange={set('bankAccount')} /></div>
+          <div><Label>IFSC</Label><Input value={form.bankIfsc} onChange={set('bankIfsc')} /></div>
+        </div>
+        <Button className="mt-2 w-full" onClick={save} disabled={saving}>
+          {saving && <Spinner className="h-4 w-4" />} Save
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 

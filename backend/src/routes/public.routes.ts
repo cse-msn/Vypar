@@ -4,7 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { ApiError } from '../utils/ApiError';
 import { Invoice } from '../models/Invoice';
 import { ensureInvoicePdf } from '../services/sales';
-import { env } from '../config/env';
+import { getShopProfile } from '../services/shopProfile';
 
 const router = Router();
 
@@ -32,14 +32,15 @@ router.get(
   '/invoices/:token',
   asyncHandler(async (req, res) => {
     const invoice = await findByToken(req.params.token);
+    const shop = await getShopProfile();
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       data: {
         shop: {
-          name: env.shop.name,
-          address: env.shop.address,
-          phone: env.shop.phone,
-          gstin: env.shop.gstin,
+          name: shop.name,
+          address: shop.address,
+          phone: shop.phone,
+          gstin: shop.gstin,
         },
         invoiceNumber: invoice.invoiceNumber,
         date: invoice.date,

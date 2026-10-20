@@ -49,14 +49,35 @@ export function ProductDetailsDialog({
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Meta label="Product code" value={product.code} />
             <Meta label="Category" value={product.category} />
+            <Meta label="Sub-category" value={product.subCategory} />
+            <Meta label="Size group" value={product.sizeGroup} />
             <Meta label="Brand" value={product.brand} />
             <Meta label="Fabric" value={product.fabric} />
             <Meta label="HSN code" value={product.hsnCode} />
             <Meta label="Unit" value={product.unit} />
             <Meta label="GST" value={product.taxRate != null ? `${product.taxRate}%` : undefined} />
-            <Meta label="Selling price" value={formatCurrency(product.sellingPrice)} />
             <Meta label="Cost" value={formatCurrency(product.costPrice)} />
+            <Meta label="Selling price" value={formatCurrency(product.sellingPrice)} />
+            <Meta label="B2C price" value={product.b2cPrice ? formatCurrency(product.b2cPrice) : undefined} />
+            <Meta label="B2B price" value={product.b2bPrice ? formatCurrency(product.b2bPrice) : undefined} />
+            <Meta label="Dupatta" value={product.dupatta} />
+            <Meta label="Dupatta height" value={product.dupattaHeight || undefined} />
+            <Meta label="Back opening" value={product.backOpening} />
+            <Meta label="Blouse size" value={product.blouseSize} />
+            <Meta label="Gher" value={product.gher || undefined} />
+            <Meta label="Cap" value={product.cap} />
+            <Meta label="Belt" value={product.belt} />
+            <Meta label="Sleeves" value={product.sleeves} />
+            <Meta label="Back closure" value={product.backClosure} />
+            <Meta label="Bottom type" value={product.bottomType} />
           </dl>
+
+          {product.description && (
+            <div>
+              <dt className="text-xs text-muted-foreground">Description</dt>
+              <dd className="whitespace-pre-wrap text-sm">{product.description}</dd>
+            </div>
+          )}
 
           <div>
             <p className="mb-1.5 text-sm font-semibold">Variants</p>

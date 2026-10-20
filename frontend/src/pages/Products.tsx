@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Package, Pencil, Trash2, Boxes, QrCode } from 'lucide-react';
+import { Plus, Search, Package, Pencil, Trash2, Boxes, QrCode, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -105,6 +105,9 @@ export default function Products() {
                         </div>
                       </button>
                       <div className="flex shrink-0 gap-1">
+                        <Button variant="ghost" size="icon" aria-label="View details" onClick={() => setDetailsFor(p)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" aria-label="Print labels" onClick={() => setLabelFor(p)}>
                           <QrCode className="h-4 w-4" />
                         </Button>

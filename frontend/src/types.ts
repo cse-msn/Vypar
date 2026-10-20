@@ -214,6 +214,19 @@ export interface Draft {
   updatedAt: string;
 }
 
+/** Shop profile (from backend config) shown on Settings and printed on invoices. */
+export interface ShopDetails {
+  name: string;
+  address?: string;
+  phone?: string;
+  gstin?: string;
+  email?: string;
+  state?: string;
+  stateCode?: string;
+  defaultHsn?: string;
+  bank: { name?: string; account?: string; ifsc?: string };
+}
+
 export interface InvoiceShare {
   publicUrl: string;
   message: string;
