@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { useSizeGroups } from '@/hooks/sizeGroups';
 
-// Ratio-set size groups. Edit here to add more.
-const SIZE_GROUPS: Record<string, string[]> = {
+// Built-in fallback size groups — used only if none are configured in Settings
+// (or while they're still loading) so the product form always works.
+const DEFAULT_SIZE_GROUPS: Record<string, string[]> = {
   '12-14-16': ['12', '14', '16'],
   '12-15-18': ['12', '15', '18'],
   '12-15-18-21-24': ['12', '15', '18', '21', '24'],
@@ -27,6 +29,8 @@ export interface GridPayload {
   variants: GridVariant[];
   salePrice: number;
   costPrice: number;
+  /** Name of the selected size group — saved on the product for its tags. */
+  sizeGroup: string;
 }
 
 interface Row {
@@ -35,11 +39,27 @@ interface Row {
 }
 
 export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => void }) {
-  const [group, setGroup] = useState<string>('20-24-28-32-36');
+  const { data: fetchedGroups } = useSizeGroups();
+  // Use configured size groups when available; fall back to the built-ins otherwise.
+  const sizeGroups = useMemo<Record<string, string[]>>(() => {
+    if (fetchedGroups && fetchedGroups.length) {
+      return Object.fromEntries(fetchedGroups.map((g) => [g.name, g.sizes]));
+    }
+    return DEFAULT_SIZE_GROUPS;
+  }, [fetchedGroups]);
+  const groupNames = Object.keys(sizeGroups);
+
+  const [group, setGroup] = useState<string>('');
   const [rows, setRows] = useState<Row[]>([{ color: '', cells: {} }]);
   const [salePrice, setSalePrice] = useState(0);
   const [costPrice, setCostPrice] = useState(0);
-  const sizes = SIZE_GROUPS[group];
+
+  // Keep the selected group valid as groups load/change.
+  useEffect(() => {
+    if (groupNames.length && (!group || !sizeGroups[group])) setGroup(groupNames[0]);
+  }, [groupNames, group, sizeGroups]);
+
+  const sizes = sizeGroups[group] ?? [];
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -55,8 +75,8 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
         variants.push({ color, size, quantity: Math.max(0, Number(raw) || 0), sellingPrice: salePrice || undefined, costPrice: costPrice || undefined });
       }
     }
-    onChangeRef.current({ variants, salePrice, costPrice });
-  }, [rows, sizes, salePrice, costPrice]);
+    onChangeRef.current({ variants, salePrice, costPrice, sizeGroup: group });
+  }, [rows, sizes, salePrice, costPrice, group]);
 
   const setCell = (ri: number, size: string, val: string) =>
     setRows((prev) => prev.map((r, i) => (i === ri ? { ...r, cells: { ...r.cells, [size]: val.replace(/[^\d]/g, '') } } : r)));
@@ -74,9 +94,9 @@ export function VariantGridEditor({ onChange }: { onChange: (p: GridPayload) => 
         <div>
           <Label>Size group</Label>
           <Select value={group} onValueChange={setGroup}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Select size group" /></SelectTrigger>
             <SelectContent>
-              {Object.keys(SIZE_GROUPS).map((g) => (
+              {groupNames.map((g) => (
                 <SelectItem key={g} value={g}>{g}</SelectItem>
               ))}
             </SelectContent>

@@ -17,6 +17,7 @@ import { connectDB, disconnectDB } from '../config/db';
 import { logger } from '../utils/logger';
 import { User, type UserDoc } from '../models/User';
 import { Supplier } from '../models/Supplier';
+import { SizeGroup } from '../models/SizeGroup';
 import { Customer } from '../models/Customer';
 import { Product, type ProductDoc } from '../models/Product';
 import { Invoice } from '../models/Invoice';
@@ -88,8 +89,26 @@ async function run() {
       Payment.deleteMany({}),
       Purchase.deleteMany({}),
       Counter.deleteMany({}),
+      SizeGroup.deleteMany({}),
     ]);
   }
+
+  // ── Size groups ──────────────────────────────────────────────────────────
+  // Ratio-set templates used by the product grid. Upserted (idempotent) so re-running
+  // the seed always keeps the defaults available without duplicating them.
+  const DEFAULT_SIZE_GROUPS: Array<{ name: string; sizes: string[] }> = [
+    { name: '12-14-16', sizes: ['12', '14', '16'] },
+    { name: '12-15-18', sizes: ['12', '15', '18'] },
+    { name: '12-15-18-21-24', sizes: ['12', '15', '18', '21', '24'] },
+    { name: '20-22-24-26', sizes: ['20', '22', '24', '26'] },
+    { name: '20-24-28-32-36', sizes: ['20', '24', '28', '32', '36'] },
+    { name: 'S-M-L-XL', sizes: ['S', 'M', 'L', 'XL'] },
+    { name: 'Free size', sizes: ['Free'] },
+  ];
+  for (const g of DEFAULT_SIZE_GROUPS) {
+    await SizeGroup.updateOne({ name: g.name }, { $setOnInsert: g }, { upsert: true });
+  }
+  logger.info(`Ensured ${DEFAULT_SIZE_GROUPS.length} size groups.`);
 
   // ── Users ──────────────────────────────────────────────────────────────
   const owner = await ensureUser('Shop Owner', 'owner@mnm.fashion', 'owner123', 'owner');

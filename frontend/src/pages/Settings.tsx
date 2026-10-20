@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, UserCog, ShieldCheck } from 'lucide-react';
+import { Plus, UserCog, ShieldCheck, Ruler, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,8 @@ import { LoadingScreen, Spinner } from '@/components/ui/spinner';
 import { api, getApiError } from '@/lib/api';
 import { qk } from '@/lib/queryKeys';
 import { useAuth } from '@/context/AuthContext';
-import type { Role, User } from '@/types';
+import { useSizeGroups, useCreateSizeGroup, useUpdateSizeGroup, useDeleteSizeGroup } from '@/hooks/sizeGroups';
+import type { Role, SizeGroup, User } from '@/types';
 
 export default function Settings() {
   const { user: me } = useAuth();
@@ -72,6 +73,8 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {me?.role === 'owner' && <SizeGroupsCard />}
 
       <Card className="mt-5">
         <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4" /> About</CardTitle></CardHeader>
@@ -173,6 +176,111 @@ function EditUserDialog({ user, isSelf, onClose, onDone }: { user: User; isSelf:
           </label>
           <div><Label>Reset password</Label><Input type="password" placeholder="Leave blank to keep" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           <Button className="w-full" onClick={save} disabled={saving}>{saving && <Spinner className="h-4 w-4" />} Save changes</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SizeGroupsCard() {
+  const { data: groups, isLoading } = useSizeGroups();
+  const del = useDeleteSizeGroup();
+  const [editing, setEditing] = useState<SizeGroup | null | 'new'>(null);
+
+  const remove = async (g: SizeGroup) => {
+    if (!window.confirm(`Delete size group "${g.name}"? This only removes the template; existing products are unaffected.`)) return;
+    try {
+      await del.mutateAsync(g._id);
+      toast.success('Size group deleted');
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    }
+  };
+
+  return (
+    <Card className="mt-5">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle className="flex items-center gap-2 text-base"><Ruler className="h-4 w-4" /> Size groups</CardTitle>
+        <Button size="sm" onClick={() => setEditing('new')}><Plus className="h-4 w-4" /> Add size group</Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <LoadingScreen />
+        ) : !groups?.length ? (
+          <p className="py-4 text-sm text-muted-foreground">No size groups yet. Add one to use it when creating products.</p>
+        ) : (
+          <TableWrap>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Sizes</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groups.map((g) => (
+                  <TableRow key={g._id}>
+                    <TableCell className="font-medium">{g.name}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <div className="flex flex-wrap gap-1">
+                        {g.sizes.map((s) => <Badge key={s} variant="secondary">{s}</Badge>)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" aria-label="Edit" onClick={() => setEditing(g)}><Pencil className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" aria-label="Delete" onClick={() => remove(g)} disabled={del.isPending}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableWrap>
+        )}
+      </CardContent>
+      {editing && <SizeGroupDialog group={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+    </Card>
+  );
+}
+
+function SizeGroupDialog({ group, onClose }: { group: SizeGroup | null; onClose: () => void }) {
+  const create = useCreateSizeGroup();
+  const update = useUpdateSizeGroup(group?._id ?? '');
+  const [name, setName] = useState(group?.name ?? '');
+  const [sizes, setSizes] = useState(group?.sizes.join(', ') ?? '');
+
+  const save = async () => {
+    const sizeList = sizes.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!name.trim()) return toast.error('Name is required');
+    if (!sizeList.length) return toast.error('Enter at least one size');
+    const body = { name: name.trim(), sizes: sizeList };
+    try {
+      if (group) await update.mutateAsync(body);
+      else await create.mutateAsync(body);
+      toast.success(group ? 'Size group updated' : 'Size group added');
+      onClose();
+    } catch (err) {
+      toast.error(getApiError(err).message);
+    }
+  };
+
+  const pending = create.isPending || update.isPending;
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader><DialogTitle>{group ? 'Edit size group' : 'Add size group'}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Name</Label>
+            <Input autoFocus placeholder="e.g. 20-24-28-32-36" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label>Sizes (comma separated)</Label>
+            <Input placeholder="e.g. 20, 24, 28, 32, 36" value={sizes} onChange={(e) => setSizes(e.target.value)} />
+            <p className="mt-1 text-xs text-muted-foreground">Order matters — sizes appear as columns in the product grid.</p>
+          </div>
+          <Button className="w-full" onClick={save} disabled={pending}>{pending && <Spinner className="h-4 w-4" />} Save</Button>
         </div>
       </DialogContent>
     </Dialog>

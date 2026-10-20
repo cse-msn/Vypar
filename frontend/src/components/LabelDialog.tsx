@@ -22,7 +22,7 @@ export function LabelDialog({
 }) {
   const [variantId, setVariantId] = useState(''); // '' = all variants
   const [copies, setCopies] = useState(1);
-  const [format, setFormat] = useState<'sheet' | 'roll'>('sheet');
+  const [format, setFormat] = useState<'sheet' | 'roll'>('roll');
 
   const variantOptions: ComboboxOption[] = [
     { value: '', label: `All variants (${product.variants.length})` },
@@ -60,8 +60,8 @@ export function LabelDialog({
             <Select value={format} onValueChange={(v) => setFormat(v as 'sheet' | 'roll')}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="sheet">A4 sticker sheet — 12 tags/page</SelectItem>
                 <SelectItem value="roll">Label printer — 50 × 25 mm (one per label)</SelectItem>
+                <SelectItem value="sheet">A4 sticker sheet — 12 tags/page</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useState, type KeyboardEvent, type ClipboardEvent } from 'react';
+import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +9,8 @@ import { Plus, Trash2, Save, ArrowLeft, Grid3x3, List } from 'lucide-react';
 import { api, getApiError } from '@/lib/api';
 import { qk } from '@/lib/queryKeys';
 import { useProduct } from '@/hooks/products';
+import { useSuppliers } from '@/hooks/suppliers';
+import { useSizeGroups } from '@/hooks/sizeGroups';
 import { PageHeader } from '@/components/PageHeader';
 import { MediaManager } from '@/components/MediaManager';
 import { CustomFieldsEditor } from '@/components/CustomFieldsEditor';
@@ -16,11 +18,47 @@ import { VariantGridEditor, type GridPayload } from '@/components/VariantGridEdi
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner, LoadingScreen } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { CustomField } from '@/types';
+
+// Product category options shown in the "Category" dropdown.
+const CATEGORIES = [
+  'Girls ( 6 month to 15 year )',
+  'Boys ( 6 month to 15 year )',
+  'Kids ( Boys & Girls - Common - Unisex )',
+  'Men',
+  'Women',
+  'Men & Women ( Common - Unisex )',
+  'Jewellery & Accessories',
+  'Raw Material',
+] as const;
+
+// Apparel categories that get a sub-category dropdown (everything except
+// Jewellery & Accessories and Raw Material).
+const APPAREL_CATEGORIES: readonly string[] = [
+  'Girls ( 6 month to 15 year )',
+  'Boys ( 6 month to 15 year )',
+  'Kids ( Boys & Girls - Common - Unisex )',
+  'Men',
+  'Women',
+  'Men & Women ( Common - Unisex )',
+];
+
+// Sub-category options shown for apparel categories.
+const SUB_CATEGORIES = [
+  'Chaniya Choli',
+  'Kediya',
+  'Jacket',
+  'Dhoti',
+  'Kurta',
+  'Blouse',
+  'Dupatta',
+  'Skirts',
+] as const;
 
 const variantSchema = z.object({
   _id: z.string().optional(),
@@ -37,6 +75,20 @@ const schema = z.object({
   designNumber: z.string().min(1, 'Design number is required'),
   name: z.string().min(1, 'Name is required'),
   category: z.string().optional(),
+  subCategory: z.string().optional(),
+  sizeGroup: z.string().optional(),
+  dupatta: z.string().optional(),
+  dupattaHeight: z.string().optional(),
+  backOpening: z.string().optional(),
+  blouseSize: z.string().optional(),
+  gher: z.string().optional(),
+  cap: z.string().optional(),
+  belt: z.string().optional(),
+  sleeves: z.string().optional(),
+  backClosure: z.string().optional(),
+  bottomType: z.string().optional(),
+  b2bPrice: z.string().min(1, 'B2B price is required'),
+  b2cPrice: z.string().min(1, 'B2C price is required'),
   fabric: z.string().optional(),
   brand: z.string().optional(),
   hsnCode: z.string().optional(),
@@ -58,28 +110,54 @@ const toNum = (s?: string) => {
 
 const emptyVariant = { color: '', size: '', sku: '', quantity: '0', sellingPrice: '', costPrice: '', lowStockThreshold: '' };
 
+// Numeric-only guard for plain text inputs (type="text" so there are no spinner
+// arrows). Allow digits and a single decimal point; let editing/navigation keys
+// and clipboard/select shortcuts through; block everything else (letters, symbols).
+function blockNonNumericKeys(e: KeyboardEvent<HTMLInputElement>) {
+  const allowed = ['Backspace', 'Delete', 'Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+  if (allowed.includes(e.key) || e.ctrlKey || e.metaKey) return;
+  // Allow a single decimal point.
+  if (e.key === '.') {
+    if (e.currentTarget.value.includes('.')) e.preventDefault();
+    return;
+  }
+  if (!/^\d$/.test(e.key)) e.preventDefault();
+}
+// Strip any non-numeric characters from a pasted value (allow digits + one dot).
+function sanitizeNumericPaste(e: ClipboardEvent<HTMLInputElement>) {
+  const text = e.clipboardData.getData('text');
+  if (/[^\d.]/.test(text)) e.preventDefault();
+}
+
 export default function ProductForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: product, isLoading } = useProduct(id);
+  const { data: suppliersData } = useSuppliers({ limit: 200 });
+  const supplierNames = (suppliersData?.data ?? []).map((s) => s.name).filter(Boolean);
+  // Blouse-size options come from the sizes defined across all configured size groups.
+  const { data: sizeGroups } = useSizeGroups();
+  const blouseSizeOptions = Array.from(new Set((sizeGroups ?? []).flatMap((g) => g.sizes)));
+  const sizeGroupOptions = (sizeGroups ?? []).map((g) => g.name);
 
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
   const [entryMode, setEntryMode] = useState<'grid' | 'rows'>('grid'); // create only
-  const [grid, setGrid] = useState<GridPayload>({ variants: [], salePrice: 0, costPrice: 0 });
+  const [grid, setGrid] = useState<GridPayload>({ variants: [], salePrice: 0, costPrice: 0, sizeGroup: '' });
 
   const {
     register,
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { designNumber: '', name: '', unit: 'Pcs', costPrice: '', sellingPrice: '', variants: [{ ...emptyVariant }] },
+    defaultValues: { designNumber: '', name: '', unit: 'Pcs', costPrice: '', sellingPrice: '', b2bPrice: '', b2cPrice: '', variants: [{ ...emptyVariant }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'variants' });
@@ -90,6 +168,20 @@ export default function ProductForm() {
         designNumber: product.designNumber,
         name: product.name,
         category: product.category ?? '',
+        subCategory: product.subCategory ?? '',
+        sizeGroup: product.sizeGroup ?? '',
+        dupatta: product.dupatta ?? '',
+        dupattaHeight: product.dupattaHeight != null ? String(product.dupattaHeight) : '',
+        backOpening: product.backOpening ?? '',
+        blouseSize: product.blouseSize ?? '',
+        gher: product.gher != null ? String(product.gher) : '',
+        cap: product.cap ?? '',
+        belt: product.belt ?? '',
+        sleeves: product.sleeves ?? '',
+        backClosure: product.backClosure ?? '',
+        bottomType: product.bottomType ?? '',
+        b2bPrice: product.b2bPrice != null ? String(product.b2bPrice) : '',
+        b2cPrice: product.b2cPrice != null ? String(product.b2cPrice) : '',
         fabric: product.fabric ?? '',
         brand: product.brand ?? '',
         hsnCode: product.hsnCode ?? '',
@@ -118,11 +210,32 @@ export default function ProductForm() {
 
   const useGrid = !isEdit && entryMode === 'grid';
 
+  // Show the sub-category dropdown only for apparel categories.
+  const selectedCategory = watch('category');
+  const showSubCategory = !!selectedCategory && APPAREL_CATEGORIES.includes(selectedCategory);
+
   const onSubmit = async (values: FormValues) => {
+    const isApparel = !!values.category && APPAREL_CATEGORIES.includes(values.category);
     const base = {
       designNumber: values.designNumber.trim(),
       name: values.name.trim(),
       category: values.category || undefined,
+      // Sub-category and the apparel attributes below only apply to apparel categories.
+      subCategory: (isApparel && values.subCategory) || undefined,
+      dupatta: (isApparel && values.dupatta) || undefined,
+      dupattaHeight: isApparel ? toNum(values.dupattaHeight) : undefined,
+      backOpening: (isApparel && values.backOpening) || undefined,
+      blouseSize: (isApparel && values.blouseSize) || undefined,
+      gher: isApparel ? toNum(values.gher) : undefined,
+      cap: (isApparel && values.cap) || undefined,
+      belt: (isApparel && values.belt) || undefined,
+      sleeves: (isApparel && values.sleeves) || undefined,
+      backClosure: (isApparel && values.backClosure) || undefined,
+      bottomType: (isApparel && values.bottomType) || undefined,
+      b2bPrice: toNum(values.b2bPrice),
+      b2cPrice: toNum(values.b2cPrice),
+      // In grid-create mode the grid's selected group is the size group; otherwise the dropdown.
+      sizeGroup: (useGrid ? grid.sizeGroup : values.sizeGroup) || undefined,
       fabric: values.fabric || undefined,
       brand: values.brand || undefined,
       hsnCode: values.hsnCode || undefined,
@@ -201,6 +314,27 @@ export default function ProductForm() {
           <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div>
+              <Label>Supplier</Label>
+              <Controller
+                control={control}
+                name="brand"
+                render={({ field }) => (
+                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                    <SelectContent>
+                      {/* Keep an existing product's saved value selectable even if it's not a current supplier. */}
+                      {field.value && !supplierNames.includes(field.value) && (
+                        <SelectItem value={field.value}>{field.value}</SelectItem>
+                      )}
+                      {supplierNames.map((n) => (
+                        <SelectItem key={n} value={n}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div>
               <Label htmlFor="designNumber">Design number *</Label>
               <Input id="designNumber" placeholder="e.g. 132" {...register('designNumber')} />
               {errors.designNumber && <p className="mt-1 text-xs text-destructive">{errors.designNumber.message}</p>}
@@ -210,14 +344,236 @@ export default function ProductForm() {
               <Input id="name" placeholder="e.g. Zig-Zag Lahenga" {...register('name')} />
               {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>}
             </div>
-            <div><Label>Category</Label><Input placeholder="Lehenga, Kurti…" {...register('category')} /></div>
-            <div><Label>Brand</Label><Input {...register('brand')} /></div>
+            <div>
+              <Label>Category</Label>
+              <Controller
+                control={control}
+                name="category"
+                render={({ field }) => (
+                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {/* Keep an existing product's legacy category selectable even if it's not in the list. */}
+                      {field.value && !CATEGORIES.includes(field.value as (typeof CATEGORIES)[number]) && (
+                        <SelectItem value={field.value}>{field.value}</SelectItem>
+                      )}
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            {showSubCategory && (
+              <div>
+                <Label>Sub-category</Label>
+                <Controller
+                  control={control}
+                  name="subCategory"
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Select sub-category" /></SelectTrigger>
+                      <SelectContent>
+                        {/* Keep an existing product's saved value selectable even if it's not in the list. */}
+                        {field.value && !SUB_CATEGORIES.includes(field.value as (typeof SUB_CATEGORIES)[number]) && (
+                          <SelectItem value={field.value}>{field.value}</SelectItem>
+                        )}
+                        {SUB_CATEGORIES.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
+            {showSubCategory && (
+              <>
+                <div>
+                  <Label>Dupatta</Label>
+                  <Controller
+                    control={control}
+                    name="dupatta"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Dupatta height</Label>
+                  <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('dupattaHeight')} />
+                </div>
+                <div>
+                  <Label>Back opening</Label>
+                  <Controller
+                    control={control}
+                    name="backOpening"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Open">Open</SelectItem>
+                          <SelectItem value="Closed">Closed</SelectItem>
+                          <SelectItem value="Backless">Backless</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Blouse size</Label>
+                  <Controller
+                    control={control}
+                    name="blouseSize"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select size" /></SelectTrigger>
+                        <SelectContent>
+                          {/* Keep an existing product's saved value selectable even if it's no longer in any size group. */}
+                          {field.value && !blouseSizeOptions.includes(field.value) && (
+                            <SelectItem value={field.value}>{field.value}</SelectItem>
+                          )}
+                          {blouseSizeOptions.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Gher</Label>
+                  <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('gher')} />
+                </div>
+                <div>
+                  <Label>Cap?</Label>
+                  <Controller
+                    control={control}
+                    name="cap"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Belt?</Label>
+                  <Controller
+                    control={control}
+                    name="belt"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Sleeves?</Label>
+                  <Controller
+                    control={control}
+                    name="sleeves"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Full">Full</SelectItem>
+                          <SelectItem value="Half">Half</SelectItem>
+                          <SelectItem value="Sleeveless">Sleeveless</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Back knot or hook?</Label>
+                  <Controller
+                    control={control}
+                    name="backClosure"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Knot">Knot</SelectItem>
+                          <SelectItem value="Hook">Hook</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div>
+                  <Label>Pant / Dhoti?</Label>
+                  <Controller
+                    control={control}
+                    name="bottomType"
+                    render={({ field }) => (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pant">Pant</SelectItem>
+                          <SelectItem value="Dhoti">Dhoti</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </>
+            )}
+            {!useGrid && (
+              <div>
+                <Label>Size group</Label>
+                <Controller
+                  control={control}
+                  name="sizeGroup"
+                  render={({ field }) => (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Select size group" /></SelectTrigger>
+                      <SelectContent>
+                        {/* Keep an existing product's saved value selectable even if it's not in the list. */}
+                        {field.value && !sizeGroupOptions.includes(field.value) && (
+                          <SelectItem value={field.value}>{field.value}</SelectItem>
+                        )}
+                        {sizeGroupOptions.map((g) => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            )}
             <div><Label>Fabric</Label><Input {...register('fabric')} /></div>
             <div><Label>HSN code</Label><Input placeholder="e.g. 6209" {...register('hsnCode')} /></div>
             <div><Label>Unit</Label><Input placeholder="Pcs" {...register('unit')} /></div>
             <div><Label>Tax rate (GST %)</Label><Input type="number" inputMode="decimal" step="0.01" placeholder="e.g. 12" {...register('taxRate')} /></div>
-            <div><Label>Default cost price</Label><Input type="number" inputMode="decimal" step="0.01" {...register('costPrice')} /></div>
-            <div><Label>Default selling price</Label><Input type="number" inputMode="decimal" step="0.01" {...register('sellingPrice')} /></div>
+            <div><Label>Purchase price</Label><Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('costPrice')} /></div>
+            <div><Label>Selling price</Label><Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('sellingPrice')} /></div>
+            <div>
+              <Label>B2B price *</Label>
+              <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('b2bPrice')} />
+              {errors.b2bPrice && <p className="mt-1 text-xs text-destructive">{errors.b2bPrice.message}</p>}
+            </div>
+            <div>
+              <Label>B2C price *</Label>
+              <Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('b2cPrice')} />
+              {errors.b2cPrice && <p className="mt-1 text-xs text-destructive">{errors.b2cPrice.message}</p>}
+            </div>
             <div className="sm:col-span-2"><Label>Description</Label><Textarea {...register('description')} /></div>
           </CardContent>
         </Card>

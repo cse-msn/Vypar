@@ -40,6 +40,20 @@ export interface Product {
   designNumber: string;
   name: string;
   category?: string;
+  subCategory?: string;
+  sizeGroup?: string;
+  dupatta?: string;
+  dupattaHeight?: number;
+  backOpening?: string;
+  blouseSize?: string;
+  gher?: number;
+  cap?: string;
+  belt?: string;
+  sleeves?: string;
+  backClosure?: string;
+  bottomType?: string;
+  b2bPrice?: number;
+  b2cPrice?: number;
   fabric?: string;
   brand?: string;
   hsnCode?: string;
@@ -74,6 +88,15 @@ export interface Customer {
   address?: string;
   notes?: string;
   balance: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SizeGroup {
+  _id: string;
+  name: string;
+  sizes: string[];
   active: boolean;
   createdAt: string;
   updatedAt: string;

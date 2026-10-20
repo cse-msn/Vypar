@@ -4,7 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { ApiError } from '../utils/ApiError';
-import { Product } from '../models/Product';
+import { Product, type ProductDoc } from '../models/Product';
 import { paginationSchema, paginate, buildMeta } from '../utils/pagination';
 import { escapeRegex } from '../utils/regex';
 import { generateLabelsPdf, type LabelItem } from '../services/labelPdf';
@@ -28,6 +28,18 @@ const productInput = z.object({
   designNumber: z.string().trim().min(1),
   name: z.string().trim().min(1),
   category: z.string().trim().optional(),
+  subCategory: z.string().trim().optional(),
+  sizeGroup: z.string().trim().optional(),
+  dupatta: z.enum(['Yes', 'No']).optional(),
+  dupattaHeight: z.coerce.number().min(0).optional(),
+  backOpening: z.enum(['Open', 'Closed', 'Backless']).optional(),
+  blouseSize: z.string().trim().optional(),
+  gher: z.coerce.number().min(0).optional(),
+  cap: z.enum(['Yes', 'No']).optional(),
+  belt: z.enum(['Yes', 'No']).optional(),
+  sleeves: z.enum(['Full', 'Half', 'Sleeveless']).optional(),
+  backClosure: z.enum(['Knot', 'Hook']).optional(),
+  bottomType: z.enum(['Pant', 'Dhoti']).optional(),
   fabric: z.string().trim().optional(),
   brand: z.string().trim().optional(),
   hsnCode: z.string().trim().optional(),
@@ -42,6 +54,8 @@ const productInput = z.object({
     .optional(),
   costPrice: z.coerce.number().min(0).default(0),
   sellingPrice: z.coerce.number().min(0).default(0),
+  b2bPrice: z.coerce.number({ invalid_type_error: 'B2B price is required' }).min(0),
+  b2cPrice: z.coerce.number({ invalid_type_error: 'B2C price is required' }).min(0),
   variants: z.array(variantInput).default([]),
 });
 
@@ -111,6 +125,55 @@ router.get(
   }),
 );
 
+/**
+ * Bulk printable tags — labels for every active product (optionally filtered by `search`,
+ * matching the product list). One PDF for a whole catalogue / filtered set.
+ * Declared before `/:id` so "labels" isn't captured as an id.
+ */
+router.get(
+  '/labels',
+  validateQuery(
+    z.object({
+      search: z.string().trim().optional(),
+      copies: z.coerce.number().int().min(1).max(50).default(1),
+      format: z.enum(['sheet', 'roll']).default('sheet'),
+      w: z.coerce.number().min(20).max(150).optional(),
+      h: z.coerce.number().min(10).max(150).optional(),
+      download: z.coerce.boolean().optional(),
+    }),
+  ),
+  asyncHandler(async (req, res) => {
+    const { search, copies, format, w, h } = req.query as unknown as {
+      search?: string;
+      copies: number;
+      format: 'sheet' | 'roll';
+      w?: number;
+      h?: number;
+    };
+    const filter: Record<string, unknown> = { active: true };
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), 'i');
+      filter.$or = [{ designNumber: rx }, { name: rx }, { brand: rx }, { 'variants.sku': rx }];
+    }
+    const products = await Product.find(filter).sort({ designNumber: 1 });
+    if (!products.length) throw ApiError.badRequest('No products match — nothing to print');
+
+    const items: LabelItem[] = [];
+    for (const product of products) items.push(...buildLabelItems(product, product.variants, copies));
+    // Guard against accidentally generating an enormous PDF.
+    if (items.length > 5000) {
+      throw ApiError.badRequest(`That would print ${items.length} labels. Narrow the search or lower the copies.`);
+    }
+
+    const pdf = await generateLabelsPdf(items, { format, widthMm: w, heightMm: h });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', pdf.length);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Disposition', `${req.query.download ? 'attachment' : 'inline'}; filename="labels-all.pdf"`);
+    res.send(pdf);
+  }),
+);
+
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
@@ -155,23 +218,7 @@ router.get(
     }
     if (variants.length === 0) throw ApiError.badRequest('This product has no variants to label');
 
-    // The size run the design comes in (across all its variants), e.g. "20-24-28-32-36".
-    const sizeGroup = formatSizeGroup(product.variants.map((v) => v.size));
-
-    const items: LabelItem[] = [];
-    for (const v of variants) {
-      const label: LabelItem = {
-        designNumber: product.designNumber,
-        shopName: env.shop.name,
-        itemCode: v.sku,
-        color: v.color,
-        designName: product.name,
-        size: v.size,
-        sizeGroup,
-        priceCode: encodePrice(v.sellingPrice ?? product.sellingPrice ?? 0),
-      };
-      for (let i = 0; i < copies; i++) items.push(label);
-    }
+    const items = buildLabelItems(product, variants, copies);
 
     const pdf = await generateLabelsPdf(items, { format, widthMm: w, heightMm: h });
     res.setHeader('Content-Type', 'application/pdf');
@@ -181,6 +228,37 @@ router.get(
     res.send(pdf);
   }),
 );
+
+/** Build the printable tag items for a product's variants (× copies each). */
+function buildLabelItems(product: ProductDoc, variants: ProductDoc['variants'][number][], copies: number): LabelItem[] {
+  // Prefer the named size group saved on the product; otherwise derive the run from its variants.
+  const fullGroup = product.sizeGroup?.trim() || formatSizeGroup(product.variants.map((v) => v.size));
+  // On the tag show only the range ends, e.g. "20-24-28-32-36" → "20-36", "S-M-L-XL" → "S-XL".
+  const sizeGroup = sizeRangeEnds(fullGroup);
+  const items: LabelItem[] = [];
+  for (const v of variants) {
+    const label: LabelItem = {
+      designNumber: product.designNumber,
+      shopName: `${env.shop.name}, Pune`,
+      itemCode: v.sku,
+      color: v.color,
+      designName: product.name,
+      size: v.size,
+      sizeGroup,
+      // Tag price is the (coded) B2B price; fall back to selling price for legacy products without one.
+      priceCode: encodePrice(product.b2bPrice ?? v.sellingPrice ?? product.sellingPrice ?? 0),
+    };
+    for (let i = 0; i < copies; i++) items.push(label);
+  }
+  return items;
+}
+
+/** Reduce a dash-joined size run to just its ends: "20-24-28-32-36" → "20-36". Single size unchanged. */
+function sizeRangeEnds(group: string): string {
+  const parts = group.split('-').map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 1) return group.trim();
+  return `${parts[0]}-${parts[parts.length - 1]}`;
+}
 
 /** Distinct sizes a design is sold in, as a "20-24-28-32-36" run (numeric sizes sorted). */
 function formatSizeGroup(sizes: string[]): string {

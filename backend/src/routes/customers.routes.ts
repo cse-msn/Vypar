@@ -7,8 +7,10 @@ import { ApiError } from '../utils/ApiError';
 import { Customer } from '../models/Customer';
 import { Invoice } from '../models/Invoice';
 import { Payment } from '../models/Payment';
+import { StoreEvent } from '../models/StoreEvent';
 import { paginationSchema, paginate, buildMeta } from '../utils/pagination';
 import { escapeRegex } from '../utils/regex';
+import { STORE_EVENT_TYPES } from '../constants';
 
 const router = Router();
 router.use(requireAuth);
@@ -54,6 +56,36 @@ router.get(
       Payment.find({ customer: customer._id }).sort({ date: -1 }).limit(100),
     ]);
     res.json({ data: { customer, invoices, payments } });
+  }),
+);
+
+/** Online-store journey: this customer's tracked events + a by-type summary. */
+router.get(
+  '/:id/journey',
+  validateQuery(paginationSchema.extend({ type: z.enum(STORE_EVENT_TYPES).optional() })),
+  asyncHandler(async (req, res) => {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) throw ApiError.notFound('Customer not found');
+    const q = req.query as unknown as z.infer<typeof paginationSchema> & { type?: string };
+    const filter: Record<string, unknown> = { customer: customer._id };
+    if (q.type) filter.type = q.type;
+    const { skip, limit } = paginate(q.page, q.limit);
+    const [events, total, byType] = await Promise.all([
+      StoreEvent.find(filter)
+        .populate({ path: 'product', select: 'designNumber name', options: { lean: true } })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      StoreEvent.countDocuments(filter),
+      StoreEvent.aggregate<{ _id: string; count: number }>([
+        { $match: { customer: customer._id } },
+        { $group: { _id: '$type', count: { $sum: 1 } } },
+      ]),
+    ]);
+    const counts = Object.fromEntries(byType.map((b) => [b._id, b.count]));
+    // "Added to cart but didn't buy" — a quick abandoned-cart signal.
+    const abandonedCart = (counts.add_to_cart ?? 0) > 0 && (counts.purchase ?? 0) === 0;
+    res.json({ data: { customer, events, counts, abandonedCart }, meta: buildMeta(total, q.page, q.limit) });
   }),
 );
 

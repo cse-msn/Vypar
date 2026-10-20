@@ -9,6 +9,12 @@ declare global {
         email: string;
         name: string;
       };
+      /** Set by storefront auth (requireCustomer) for the customer-facing shop API. */
+      customer?: {
+        id: string;
+        email: string;
+        name: string;
+      };
     }
   }
 }

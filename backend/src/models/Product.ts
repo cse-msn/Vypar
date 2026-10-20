@@ -32,6 +32,20 @@ export interface IProduct {
   designNumber: string;
   name: string;
   category?: string;
+  subCategory?: string;
+  /** Named size group the design is sold in (e.g. "20-24-28-32-36") — printed on tags. */
+  sizeGroup?: string;
+  /** Apparel attributes (only relevant for clothing categories). */
+  dupatta?: string; // 'Yes' | 'No'
+  dupattaHeight?: number;
+  backOpening?: string; // 'Open' | 'Closed' | 'Backless'
+  blouseSize?: string; // a size drawn from the configured size groups
+  gher?: number;
+  cap?: string; // 'Yes' | 'No'
+  belt?: string; // 'Yes' | 'No'
+  sleeves?: string; // 'Full' | 'Half' | 'Sleeveless'
+  backClosure?: string; // 'Knot' | 'Hook'
+  bottomType?: string; // 'Pant' | 'Dhoti'
   fabric?: string;
   brand?: string;
   hsnCode?: string;
@@ -44,6 +58,8 @@ export interface IProduct {
   customFields: ICustomField[];
   costPrice: number;
   sellingPrice: number;
+  b2bPrice?: number;
+  b2cPrice?: number;
   variants: Types.DocumentArray<IVariant>;
   active: boolean;
   createdAt: Date;
@@ -75,6 +91,18 @@ const productSchema = new Schema<IProduct>(
     designNumber: { type: String, required: true, unique: true, trim: true, uppercase: true, index: true },
     name: { type: String, required: true, trim: true },
     category: { type: String, trim: true },
+    subCategory: { type: String, trim: true },
+    sizeGroup: { type: String, trim: true },
+    dupatta: { type: String, trim: true },
+    dupattaHeight: { type: Number },
+    backOpening: { type: String, trim: true },
+    blouseSize: { type: String, trim: true },
+    gher: { type: Number },
+    cap: { type: String, trim: true },
+    belt: { type: String, trim: true },
+    sleeves: { type: String, trim: true },
+    backClosure: { type: String, trim: true },
+    bottomType: { type: String, trim: true },
     fabric: { type: String, trim: true },
     brand: { type: String, trim: true },
     hsnCode: { type: String, trim: true },
@@ -90,6 +118,8 @@ const productSchema = new Schema<IProduct>(
     },
     costPrice: { type: Number, default: 0, min: 0 },
     sellingPrice: { type: Number, default: 0, min: 0 },
+    b2bPrice: { type: Number, min: 0 },
+    b2cPrice: { type: Number, min: 0 },
     variants: { type: [variantSchema], default: [] },
     active: { type: Boolean, default: true },
   },

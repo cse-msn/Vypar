@@ -5,7 +5,7 @@ import { validateBody, validateQuery } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { ApiError } from '../utils/ApiError';
 import { Purchase } from '../models/Purchase';
-import { createPurchase, cancelPurchase } from '../services/purchases';
+import { createPurchase, updatePurchase, cancelPurchase } from '../services/purchases';
 import { paginationSchema, paginate, buildMeta } from '../utils/pagination';
 
 const router = Router();
@@ -71,6 +71,15 @@ router.post(
   asyncHandler(async (req, res) => {
     const purchase = await createPurchase(req.body, req.user);
     res.status(201).json({ data: purchase });
+  }),
+);
+
+router.put(
+  '/:id',
+  validateBody(createSchema),
+  asyncHandler(async (req, res) => {
+    const purchase = await updatePurchase(req.params.id, req.body, req.user);
+    res.json({ data: purchase, message: 'Purchase updated' });
   }),
 );
 

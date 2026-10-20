@@ -44,6 +44,21 @@ export function useCreatePurchase() {
   });
 }
 
+export function useUpdatePurchase(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: CreatePurchaseBody) => (await api.put(`/purchases/${id}`, body)).data.data as Purchase,
+    onSuccess: () => {
+      // Editing changes inventory, supplier balance, and reports.
+      qc.invalidateQueries({ queryKey: qk.purchases });
+      qc.invalidateQueries({ queryKey: qk.purchase(id) });
+      qc.invalidateQueries({ queryKey: qk.products });
+      qc.invalidateQueries({ queryKey: qk.suppliers });
+      qc.invalidateQueries({ queryKey: qk.reports });
+    },
+  });
+}
+
 export function useCancelPurchase() {
   const qc = useQueryClient();
   return useMutation({

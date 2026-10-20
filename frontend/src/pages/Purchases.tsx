@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Truck, Ban } from 'lucide-react';
+import { Plus, Truck, Ban, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
@@ -80,9 +80,14 @@ export default function Purchases() {
                   </TableCell>
                   <TableCell className="text-right">
                     {p.status === 'received' && (
-                      <Button variant="ghost" size="icon" aria-label="Cancel" onClick={() => setToCancel(p)}>
-                        <Ban className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <>
+                        <Button asChild variant="ghost" size="icon" aria-label="Edit">
+                          <Link to={`/purchases/${p._id}/edit`}><Pencil className="h-4 w-4" /></Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" aria-label="Cancel" onClick={() => setToCancel(p)}>
+                          <Ban className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
                     )}
                   </TableCell>
                 </TableRow>

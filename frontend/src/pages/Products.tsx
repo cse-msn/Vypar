@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState } from '@/components/EmptyState';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { LabelDialog } from '@/components/LabelDialog';
+import { BulkLabelDialog } from '@/components/BulkLabelDialog';
 import { Pagination } from '@/components/Pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ export default function Products() {
   const del = useDeleteProduct();
   const [toDelete, setToDelete] = useState<Product | null>(null);
   const [labelFor, setLabelFor] = useState<Product | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -45,9 +47,14 @@ export default function Products() {
         title="Products"
         subtitle="Manage designs, colours, sizes & stock."
         actions={
-          <Button asChild>
-            <Link to="/products/new"><Plus className="h-4 w-4" /> Add product</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
+              <QrCode className="h-4 w-4" /> Print labels
+            </Button>
+            <Button asChild>
+              <Link to="/products/new"><Plus className="h-4 w-4" /> Add product</Link>
+            </Button>
+          </div>
         }
       />
 
@@ -135,6 +142,8 @@ export default function Products() {
       {labelFor && (
         <LabelDialog product={labelFor} open={!!labelFor} onOpenChange={(v) => !v && setLabelFor(null)} />
       )}
+
+      <BulkLabelDialog search={search} open={bulkOpen} onOpenChange={setBulkOpen} />
     </div>
   );
 }

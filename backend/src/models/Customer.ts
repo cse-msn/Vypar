@@ -1,4 +1,6 @@
-import { Schema, model, type HydratedDocument } from 'mongoose';
+import { Schema, model, type HydratedDocument, type Model } from 'mongoose';
+import bcrypt from 'bcryptjs';
+import { env } from '../config/env';
 import { applyToJSON } from '../utils/toJSON';
 
 export interface ICustomer {
@@ -13,13 +15,23 @@ export interface ICustomer {
   /** Outstanding amount receivable from this customer (they owe us). */
   balance: number;
   active: boolean;
+  /** Set when the customer self-registers on the online store (enables login). */
+  passwordHash?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type CustomerDoc = HydratedDocument<ICustomer>;
+export interface ICustomerMethods {
+  comparePassword(candidate: string): Promise<boolean>;
+}
 
-const customerSchema = new Schema<ICustomer>(
+interface CustomerModel extends Model<ICustomer, {}, ICustomerMethods> {
+  hashPassword(plain: string): Promise<string>;
+}
+
+export type CustomerDoc = HydratedDocument<ICustomer, ICustomerMethods>;
+
+const customerSchema = new Schema<ICustomer, CustomerModel, ICustomerMethods>(
   {
     name: { type: String, required: true, trim: true, index: true },
     phone: { type: String, trim: true, index: true },
@@ -30,11 +42,20 @@ const customerSchema = new Schema<ICustomer>(
     notes: { type: String, trim: true },
     balance: { type: Number, default: 0 },
     active: { type: Boolean, default: true },
+    passwordHash: { type: String, select: false },
   },
   { timestamps: true },
 );
 
 customerSchema.index({ name: 'text', phone: 'text' });
-applyToJSON(customerSchema);
 
-export const Customer = model<ICustomer>('Customer', customerSchema);
+customerSchema.method('comparePassword', function (candidate: string) {
+  return this.passwordHash ? bcrypt.compare(candidate, this.passwordHash) : Promise.resolve(false);
+});
+customerSchema.static('hashPassword', function (plain: string) {
+  return bcrypt.hash(plain, env.BCRYPT_ROUNDS);
+});
+
+applyToJSON(customerSchema, ['passwordHash']);
+
+export const Customer = model<ICustomer, CustomerModel>('Customer', customerSchema);
