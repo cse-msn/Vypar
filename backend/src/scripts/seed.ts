@@ -77,6 +77,9 @@ const pline = (p: ProductDoc, variantIdx: number, quantity: number, costPrice: n
 
 async function run() {
   const fresh = process.argv.includes('--fresh');
+  // Production bootstrap: create the owner/staff logins + colours + size groups, but NO sample
+  // business data (products/invoices/etc.). Use this when first seeding a real shop's database.
+  const ownerOnly = process.argv.includes('--owner-only');
   await connectDB();
 
   if (fresh) {
@@ -125,6 +128,13 @@ async function run() {
   const staff = await ensureUser('Priya Counter', 'staff@mnm.fashion', 'staff123', 'staff');
   const ownerCtx = { id: String(owner._id) };
   const staffCtx = { id: String(staff._id) };
+
+  if (ownerOnly) {
+    logger.info('--owner-only: created logins + colours + size groups, skipping sample business data.');
+    await disconnectDB();
+    logger.info('Seed complete (owner-only). Change the default passwords now!');
+    process.exit(0);
+  }
 
   // Sample business data is only generated when the catalogue is empty, so re-running
   // the seed never duplicates invoices/purchases/stock.

@@ -53,7 +53,14 @@ export function createApp() {
   app.use('/api', apiLimiter, routes);
 
   // Optional: serve the built frontend from this process (single-service deployment).
-  const distDir = path.resolve(process.cwd(), '..', 'frontend', 'dist');
+  // Resolve against __dirname (compiled to backend/dist) so it works no matter the CWD
+  // the host launches us from; fall back to CWD-relative candidates.
+  const distCandidates = [
+    path.resolve(__dirname, '..', '..', 'frontend', 'dist'),
+    path.resolve(process.cwd(), '..', 'frontend', 'dist'),
+    path.resolve(process.cwd(), 'frontend', 'dist'),
+  ];
+  const distDir = distCandidates.find((d) => fs.existsSync(d)) ?? distCandidates[0];
   if (fs.existsSync(distDir)) {
     logger.info(`Serving frontend from ${distDir}`);
     app.use(express.static(distDir));

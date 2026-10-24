@@ -23,4 +23,4 @@ A product field must be wired through every layer or it silently won't save. Tou
 - **Required field:** add a zod `.min(1, 'X is required')`, include in `defaultValues`, and render `errors.x` under the input (see B2B/B2C price).
 
 ## Verify
-`npm run typecheck -w backend` and `-w frontend` (ignore the pre-existing vitest test-file error). If it affects tags, also check the label (`label` skill).
+`npm run typecheck -w backend` and `-w frontend` (both are clean gates now). If it affects tags, also check the label (`label` skill).

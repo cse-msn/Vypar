@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.env
+**/.env
+*.log
+.storage
+frontend/mnm.txt
+docs
+.claude

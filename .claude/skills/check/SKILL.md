@@ -12,7 +12,7 @@ There is **no linter** in this repo (the `lint` script is a no-op). The gate is 
 npm run typecheck -w backend      # tsc --noEmit (backend)
 npm run typecheck -w frontend     # tsc --noEmit (frontend)
 ```
-Known noise to ignore: the **frontend typecheck surfaces a pre-existing `vitest` type-declaration error** in `*.test.*` files (`Could not find a declaration file for module 'vitest'`). It is unrelated to app code — judge your change by whether *your* edited files appear in the error list, not by the overall exit code. A quick way to filter: run the typecheck and grep the output for the files you touched.
+Both `typecheck` and `build` use `frontend/tsconfig.build.json` (excludes `*.test.*`), so the frontend gate is clean — a non-zero exit means a real error in your code. Tests themselves are type-checked at runtime by Vitest via `npm run test`.
 
 ## Tests
 ```bash

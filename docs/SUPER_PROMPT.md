@@ -124,7 +124,7 @@ VITE_HTTPS=true npm run dev:web           # HTTPS for phone camera scanning on t
 ```
 Seed logins: owner `owner@mnm.fashion`/`owner123`, staff `staff@mnm.fashion`/`staff123`. **MongoDB must be running**
 (`MONGODB_URI`); the backend validates env on boot and won't start otherwise. **No linter** — use typecheck.
-There's a harmless pre-existing `vitest` type error in `*.test.*` files; judge changes by whether your files appear.
+`typecheck`/`build` use `frontend/tsconfig.build.json` (excludes `*.test.*`), so the gate is clean.
 
 ## 7. Conventions to preserve
 

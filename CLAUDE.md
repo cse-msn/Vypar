@@ -38,7 +38,7 @@ npm run seed:more -w backend     # add extra dummy data
 
 Run a single backend test: `cd backend && npx vitest run src/path/to/file.test.ts` or `npx vitest run -t "test name"` (add `--watch` for watch mode).
 
-**No linter is configured** — the root `lint` script is a `--if-present` no-op. Use `typecheck` as the gate. Note: a pre-existing `vitest` type-declaration error surfaces in `*.test.*` files during `typecheck`; it is unrelated to app code — judge your changes by whether *your* files appear in the errors.
+**No linter is configured** — the root `lint` script is a `--if-present` no-op. Use `typecheck` as the gate. Both `typecheck` and `build` use `frontend/tsconfig.build.json`, which excludes `*.test.*` files (tests are checked at runtime by Vitest), so the gate is clean.
 
 **Prerequisites:** MongoDB must be reachable at `backend/.env`'s `MONGODB_URI` (default `mongodb://127.0.0.1:27017`). The backend validates its entire env with zod on boot (`src/config/env.ts`) and **refuses to start** if anything required is missing/invalid — so configuration fails fast, not at request time.
 
