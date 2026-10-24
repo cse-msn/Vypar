@@ -206,6 +206,47 @@ export interface Purchase {
   createdAt: string;
 }
 
+export interface OrderItem {
+  product: string;
+  variantId: string;
+  designNumber: string;
+  productName: string;
+  color: string;
+  size: string;
+  sku?: string;
+  quantity: number;
+  price: number;
+  amount: number;
+}
+
+export interface ShippingAddress {
+  name: string;
+  phone: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state?: string;
+  pincode: string;
+}
+
+export interface Order {
+  _id: string;
+  orderNumber: string;
+  customer: string | Customer;
+  items: OrderItem[];
+  subtotal: number;
+  shippingFee: number;
+  discount: number;
+  total: number;
+  paymentMethod: 'cod' | 'online';
+  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  status: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled';
+  shippingAddress: ShippingAddress;
+  notes?: string;
+  placedAt: string;
+  createdAt: string;
+}
+
 export interface Paginated<T> {
   data: T[];
   meta: { total: number; page: number; limit: number; pages: number; hasMore: boolean };

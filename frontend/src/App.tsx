@@ -16,6 +16,7 @@ const ProductForm = lazy(() => import('@/pages/ProductForm'));
 const StockLookup = lazy(() => import('@/pages/StockLookup'));
 const Invoices = lazy(() => import('@/pages/Invoices'));
 const InvoiceDetail = lazy(() => import('@/pages/InvoiceDetail'));
+const Orders = lazy(() => import('@/pages/Orders'));
 const Customers = lazy(() => import('@/pages/Customers'));
 const Suppliers = lazy(() => import('@/pages/Suppliers'));
 const Purchases = lazy(() => import('@/pages/Purchases'));
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="stock" element={<StockLookup />} />
             <Route path="invoices" element={<Invoices />} />
             <Route path="invoices/:id" element={<InvoiceDetail />} />
+            <Route path="orders" element={<Orders />} />
             <Route path="customers" element={<Customers />} />
             <Route path="purchases" element={<Purchases />} />
             <Route path="purchases/new" element={<PurchaseForm />} />

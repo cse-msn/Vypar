@@ -31,9 +31,14 @@ Customer-facing site at **`/shop`** (public routes, same app, outside the admin 
 Login/Register/Orders. Mounted in `App.tsx` as `/shop/*`. Prices shown are B2C. Journey events fire on view/
 search/add_to_cart/begin_checkout/purchase.
 
+## Admin online-orders view (built)
+Staff/owner manage online orders at **/orders** (`frontend/src/pages/Orders.tsx`, nav "Online Orders") via admin API
+`GET/PATCH /api/orders` + `POST /api/orders/:id/cancel` (`backend/src/routes/orders.routes.ts`). Update fulfilment
+status (placed→…→delivered; delivered auto-marks a COD order paid); cancel returns stock (`cancelOrder`).
+
 ## Planned (not built yet) — see MEMORY `storefront-ecommerce-build`
-Razorpay online payment (needs `RAZORPAY_KEY_ID/SECRET`; COD works now); order status management in the admin;
-S3 media go-live. The `Order` model + constants exist and orders are live (COD).
+Razorpay online payment (needs `RAZORPAY_KEY_ID/SECRET`; COD works now); storefront UI polish; S3 media go-live;
+custom domain. The `Order` model + constants exist and orders are live (COD).
 
 ## Conventions
 Follow the same envelope as the rest of the API: lists `{ data, meta }`, single `{ data }`. Online orders must reduce inventory through `backend/src/services/stock.ts`, never ad-hoc. Never expose cost/B2B/supplier data on public routes.

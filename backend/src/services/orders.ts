@@ -86,3 +86,17 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
     throw err;
   }
 }
+
+/** Cancel an order and return its reserved stock to inventory. */
+export async function cancelOrder(orderId: string): Promise<OrderDoc> {
+  const order = await Order.findById(orderId);
+  if (!order) throw ApiError.notFound('Order not found');
+  if (order.status === 'cancelled') throw ApiError.badRequest('Order is already cancelled');
+  await releaseStock(
+    order.items.map((i) => ({ productId: String(i.product), variantId: String(i.variantId), quantity: i.quantity })),
+  );
+  order.status = 'cancelled';
+  order.cancelledAt = new Date();
+  await order.save();
+  return order;
+}

@@ -19,6 +19,10 @@ export const qk = {
   sizeGroups: ['sizeGroups'] as const,
   colors: ['colors'] as const,
 
+  orders: ['orders'] as const,
+  orderList: (params?: unknown) => ['orders', 'list', params] as const,
+  order: (id: string) => ['orders', 'detail', id] as const,
+
   invoices: ['invoices'] as const,
   invoiceList: (params?: unknown) => ['invoices', 'list', params] as const,
   invoice: (id: string) => ['invoices', 'detail', id] as const,
