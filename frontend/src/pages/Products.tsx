@@ -125,7 +125,7 @@ export default function Products() {
                       <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Boxes className="h-4 w-4" /> {p.totalStock} pcs · {p.variants.length} variants
                       </span>
-                      <span className="font-semibold">{formatCurrency(p.sellingPrice)}</span>
+                      <span className="font-semibold">{formatCurrency(p.b2cPrice ?? p.sellingPrice)}</span>
                     </div>
                     {low && <Badge variant="warning" className="mt-2">Low stock</Badge>}
                   </CardContent>

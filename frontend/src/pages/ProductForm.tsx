@@ -288,7 +288,9 @@ export default function ProductForm() {
       videos,
       customFields: customFields.filter((f) => f.label.trim()).map((f) => ({ label: f.label.trim(), value: f.value.trim() })),
       costPrice: toNum(values.costPrice) ?? grid.costPrice ?? 0,
-      sellingPrice: toNum(values.sellingPrice) ?? grid.salePrice ?? 0,
+      // Retail (selling) price mirrors B2C — the "Selling price" field was removed, so B2C is
+      // the customer price used on cards, billing defaults and reports.
+      sellingPrice: toNum(values.b2cPrice) ?? toNum(values.sellingPrice) ?? grid.salePrice ?? 0,
     };
 
     try {
