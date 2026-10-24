@@ -29,8 +29,13 @@ export function createApp() {
     cors({
       origin(origin, callback) {
         // Allow same-origin / server-to-server (no Origin header) and whitelisted origins.
+        // For a disallowed origin, resolve WITHOUT CORS headers (callback(null, false)) rather
+        // than throwing — a thrown error 500s the request, which would also break same-origin
+        // module/script loads the browser sends in CORS mode (Vite's `crossorigin` assets),
+        // blanking the page. Returning false lets same-origin assets serve and simply denies
+        // cross-origin JS the ability to read the response.
         if (!origin || env.corsOrigins.includes(origin)) return callback(null, true);
-        callback(new Error(`Origin not allowed by CORS: ${origin}`));
+        callback(null, false);
       },
       credentials: true,
       // Let the browser read the download filename we set on PDF responses.

@@ -34,3 +34,8 @@ here). Prepare code + envs and hand over exact steps; run `npx vercel`/deploy CL
 - Render free **spins down after ~15 min idle** → first request ~30–50 s. Upgrade or use Cloud Run if it matters.
 - Backend won't boot if env is invalid (zod fail-fast) — check Render logs for the missing var.
 - After adding the custom domain, update `CORS_ORIGINS` + `PUBLIC_APP_URL` to `https://admin.garba.store` and redeploy.
+- **Blank page / assets 500 with `Origin` header** = `CORS_ORIGINS` doesn't include the site's own URL. Vite marks
+  module scripts `crossorigin`, so the browser sends `Origin` even same-origin; set `CORS_ORIGINS` to the exact public
+  URL. (The build commands in Render must also be `npm ci --include=dev && npm run build`, or devDeps are skipped and
+  Render's global `tsc` fails with `moduleResolution=node10 removed`.)
+- The CORS middleware denies unknown origins by withholding headers (not 500-ing), so a misconfig no longer blanks the page.
