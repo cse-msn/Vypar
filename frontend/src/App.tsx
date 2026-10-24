@@ -24,6 +24,7 @@ const Payments = lazy(() => import('@/pages/Payments'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const PublicBill = lazy(() => import('@/pages/PublicBill'));
+const StoreApp = lazy(() => import('@/store/StoreApp'));
 
 export default function App() {
   return (
@@ -32,6 +33,8 @@ export default function App() {
         {/* Public */}
         <Route path="/login" element={<Login />} />
         <Route path="/bill/:token" element={<PublicBill />} />
+        {/* Customer-facing online store */}
+        <Route path="/shop/*" element={<StoreApp />} />
 
         {/* Authenticated app */}
         <Route element={<ProtectedRoute />}>
