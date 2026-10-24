@@ -1,6 +1,7 @@
-# Render blueprint for MNM Fashion (single free web service: API + website).
+# Render blueprint for MNM Fashion — SINGLE free web service (API + website in one deploy).
+# The backend serves the built frontend (frontend/dist), so the browser is same-origin (no CORS hop).
 # Create via Render dashboard → "New +" → "Blueprint" → pick this repo.
-# Secrets (MONGODB_URI, S3_*, JWT_SECRET, etc.) are set in the dashboard, NOT here.
+# Secrets (MONGODB_URI, S3_*, etc.) are set in the dashboard, NOT here.
 services:
   - type: web
     name: mnm-fashion
@@ -8,8 +9,8 @@ services:
     region: singapore          # closest free region to India
     plan: free                 # spins down after ~15 min idle (first request is slow)
     branch: main
-    buildCommand: npm install && npm run build
-    startCommand: npm run start -w backend
+    buildCommand: npm install && npm run build   # builds BOTH backend + frontend
+    startCommand: npm run start -w backend       # serves API + website on one port
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
@@ -24,6 +25,8 @@ services:
       - key: STORAGE_DRIVER
         value: s3
       # The rest are set as secrets in the dashboard (see docs/PRODUCTION_SETUP.md):
-      #   MONGODB_URI, CORS_ORIGINS, PUBLIC_APP_URL,
+      #   MONGODB_URI,
+      #   CORS_ORIGINS   = your public URL (onrender URL first, then https://admin.garba.store)
+      #   PUBLIC_APP_URL = same public URL (used in invoice / WhatsApp links)
       #   S3_BUCKET, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_ENDPOINT, S3_FORCE_PATH_STYLE,
       #   SHOP_* fields

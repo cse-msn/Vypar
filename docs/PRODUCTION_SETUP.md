@@ -1,119 +1,99 @@
-# Production Setup — garba.store (cheapest free stack)
+# Production Setup — garba.store (single service on Render)
 
 Deploy MNM Fashion live for ~₹0/month (you already own the domain). This is the **admin / billing app**
-(the customer storefront is a later phase). Follow top to bottom. Steps marked **[YOU]** need your
-accounts/credentials and can't be automated.
+(the customer storefront is a later phase). Steps marked **[YOU]** need your accounts/credentials and can't
+be automated from the dev environment (no account creation / browser login there).
 
 ## The stack
 
-| Piece | Service | Cost |
-|---|---|---|
-| Database | **MongoDB Atlas M0** | Free forever (512 MB) |
-| Images/videos/PDFs | **Cloudflare R2** | Free (10 GB, no egress) — bucket stays **private**, the app streams media |
-| Hosting (API + website, one service) | **Render** free web service | Free (spins down after ~15 min idle) |
-| Domain | **garba.store** (GoDaddy) | Already owned |
+| Piece | Service | Cost | Notes |
+|---|---|---|---|
+| **Hosting (API + website)** | **Render** free web service | Free | One deploy — the backend serves the built frontend. ~30 s cold start after ~15 min idle |
+| **Database** | **MongoDB Atlas M0** | Free forever | No code change |
+| **Files** (images/videos/PDFs) | **Cloudflare R2** | Free (10 GB, no egress) | Private bucket; the API streams media |
+| **Domain** | **garba.store** (GoDaddy) | Owned | `admin.garba.store` → Render; apex kept for the future storefront |
 
-Already done in the repo: production build works (`npm run build`), the backend serves the built website
-(single service), a `Dockerfile` + `render.yaml` exist, and `npm run seed -w backend -- --owner-only`
-bootstraps a clean shop (logins + colours + size groups, no demo data).
+Already prepared in the repo: builds pass (`npm run build`); the backend serves `frontend/dist` (single service);
+`render.yaml` (builds both, starts backend) + `Dockerfile` (if you ever move to Cloud Run, no cold start);
+`npm run seed -w backend -- --owner-only` for a clean shop bootstrap.
+
+> No-cold-start alternative: the `Dockerfile` deploys the same single service to **Google Cloud Run**
+> (`gcloud run deploy --source .`), which scales to zero (pay-per-use, no fixed cost). Same env vars.
 
 ---
 
-## 1. [YOU] Push the repo to GitHub
-Render deploys from GitHub.
+## 1. [YOU] Push to GitHub
 ```bash
 git add -A && git commit -m "Prepare for production deploy"
-# create an empty repo on github.com, then:
 git remote add origin https://github.com/<you>/vypar.git
-git branch -M main
-git push -u origin main
+git branch -M main && git push -u origin main
 ```
 
 ## 2. [YOU] MongoDB Atlas (database)
-1. Sign up at mongodb.com/atlas → **Create** a **M0 (Free)** cluster. Provider **AWS**, region **Mumbai (ap-south-1)**.
-2. **Database Access** → Add user (username + strong password). Role: *Read and write to any database*.
-3. **Network Access** → Add IP → **Allow access from anywhere** (`0.0.0.0/0`) — Render's IPs are dynamic.
-4. **Connect** → *Drivers* → copy the **SRV URI**, e.g.
-   `mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/mnm_fashion?retryWrites=true&w=majority`
-   (keep the `/mnm_fashion` db name). Save it — this is `MONGODB_URI`.
+1. mongodb.com/atlas → create a **M0 (Free)** cluster. Provider **AWS**, region **Mumbai (ap-south-1)**.
+2. **Database Access** → add a user + strong password (role: read/write any database).
+3. **Network Access** → **Allow from anywhere** (`0.0.0.0/0`) — Render IPs are dynamic.
+4. **Connect → Drivers** → copy the SRV URI; keep `/mnm_fashion` as the db name. This is `MONGODB_URI`.
 
 ## 3. [YOU] Cloudflare R2 (file storage)
-1. Sign up at cloudflare.com → **R2** → **Create bucket** (e.g. `garba-media`). Leave it **private**.
-2. **R2 → Manage API Tokens → Create API token** (Object Read & Write). Copy the **Access Key ID** and
-   **Secret Access Key**.
-3. Note your **S3 API endpoint**: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (R2 → bucket → Settings).
-4. These map to env vars:
-   - `S3_BUCKET` = `garba-media`
-   - `S3_REGION` = `auto`
-   - `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` = the token keys
-   - `S3_ENDPOINT` = `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-   - `S3_FORCE_PATH_STYLE` = `true`
-   - `STORAGE_DRIVER` = `s3`
+1. cloudflare.com → **R2** → create a **private** bucket (e.g. `garba-media`).
+2. **Manage API Tokens → Create** (Object Read & Write) → copy the Access Key ID + Secret.
+3. Endpoint: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.
+4. Env vars: `S3_BUCKET=garba-media`, `S3_REGION=auto`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`,
+   `S3_ENDPOINT=<endpoint>`, `S3_FORCE_PATH_STYLE=true`, `STORAGE_DRIVER=s3`.
 
 ## 4. [YOU] Deploy on Render
-1. render.com → **New + → Blueprint** → connect your GitHub repo. Render reads `render.yaml` and creates the
-   `mnm-fashion` web service (free, Singapore, health check `/api/health`).
-2. In the service → **Environment**, add these (JWT_SECRET is auto-generated by the blueprint):
+1. render.com → **New + → Blueprint** → pick your repo. It reads `render.yaml` and creates the `mnm-fashion`
+   web service (free, Singapore, builds both workspaces, starts the backend, health check `/api/health`).
+2. Service → **Environment** → add the secrets (`JWT_SECRET` is auto-generated by the blueprint):
    ```
-   MONGODB_URI            = <Atlas SRV URI from step 2>
-   STORAGE_DRIVER         = s3
-   S3_BUCKET              = garba-media
-   S3_REGION              = auto
-   S3_ACCESS_KEY_ID       = <R2 key>
-   S3_SECRET_ACCESS_KEY   = <R2 secret>
-   S3_ENDPOINT            = https://<ACCOUNT_ID>.r2.cloudflarestorage.com
-   S3_FORCE_PATH_STYLE    = true
-   CORS_ORIGINS           = https://<your-service>.onrender.com   (update to your domain in step 6)
-   PUBLIC_APP_URL         = https://<your-service>.onrender.com   (update in step 6)
-   SHOP_NAME              = MNM Fashion
-   SHOP_ADDRESS, SHOP_PHONE, SHOP_GSTIN, SHOP_STATE, SHOP_STATE_CODE, SHOP_BANK_* ...  (as in backend/.env.example)
+   MONGODB_URI          = <Atlas SRV URI>
+   STORAGE_DRIVER       = s3
+   S3_BUCKET            = garba-media
+   S3_REGION            = auto
+   S3_ACCESS_KEY_ID     = <R2 key>
+   S3_SECRET_ACCESS_KEY = <R2 secret>
+   S3_ENDPOINT          = https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+   S3_FORCE_PATH_STYLE  = true
+   CORS_ORIGINS         = https://mnm-fashion.onrender.com   # update to the custom domain in step 6
+   PUBLIC_APP_URL       = https://mnm-fashion.onrender.com   # update in step 6
+   SHOP_NAME, SHOP_ADDRESS, SHOP_PHONE, SHOP_GSTIN, SHOP_STATE, SHOP_STATE_CODE, SHOP_BANK_*   # per backend/.env.example
    ```
-3. **Create** / **Deploy**. Wait for "Live". Visit `https://<your-service>.onrender.com/api/health` → `{status:"ok"}`.
-
-> Alternative host (no cold-starts, pay-per-use): the included `Dockerfile` deploys as-is to **Google Cloud Run**
-> (`gcloud run deploy --source .`) or Fly.io/Railway/Azure Container Apps. Same env vars.
+   > `CORS_ORIGINS` must include your public URL: even though the site is same-origin, the browser sends an
+   > `Origin` header on POSTs, and the API rejects origins not on the list. Set it to your actual URL.
+3. Deploy → wait for **Live** → open `https://mnm-fashion.onrender.com/api/health` → `{status:"ok"}`, then the root URL loads the app.
 
 ## 5. [YOU] Seed the production database (one time)
-From your machine, point the seed at Atlas to create your owner login + colours + size groups (no demo data):
+From your machine, pointed at Atlas — creates owner/staff logins + colours + size groups, **no demo data**:
 ```powershell
 $env:MONGODB_URI="<Atlas SRV URI>"; npm run seed -w backend -- --owner-only
 ```
-This creates `owner@mnm.fashion / owner123` and `staff@mnm.fashion / staff123`.
-**Log in and change both passwords immediately** (Settings → Users), then rename/replace them with your real accounts.
+Log in as `owner@mnm.fashion / owner123`, then **change both passwords immediately** (Settings → Users).
 
-## 6. [YOU] Point garba.store at it (GoDaddy)
-Recommended: put the admin app on a **subdomain** now and keep the apex `garba.store` free for the future
-customer storefront.
-1. Render → your service → **Settings → Custom Domains → Add** `admin.garba.store`. Render shows a **CNAME target**
+## 6. [YOU] Custom domain admin.garba.store (GoDaddy)
+Put the admin app on a subdomain; keep the apex `garba.store` for the future storefront.
+1. Render → service → **Settings → Custom Domains → Add** `admin.garba.store`. Render shows a **CNAME target**
    (`<service>.onrender.com`).
-2. GoDaddy → **my domains → garba.store → DNS → Add record**:
-   - Type **CNAME**, Name **admin**, Value **`<service>.onrender.com`**, TTL 1 hr.
-3. Back in Render, wait for the domain to verify — it issues a free HTTPS certificate automatically (a few minutes).
-4. Update the two env vars to the real URL and redeploy:
+2. GoDaddy → **garba.store → DNS → Add record**: Type **CNAME**, Name **admin**, Value **`<service>.onrender.com`**, TTL 1 hr.
+3. Render verifies and issues free HTTPS automatically (a few minutes).
+4. Update env to the final URL and redeploy:
    ```
    CORS_ORIGINS   = https://admin.garba.store
    PUBLIC_APP_URL = https://admin.garba.store
    ```
-   (`PUBLIC_APP_URL` is used in the WhatsApp/customer invoice links, so it must be the public URL.)
-
-> Want it on the apex `garba.store` instead? GoDaddy can't CNAME the apex. Either (a) move the domain's DNS to
-> **Cloudflare (free)** which supports CNAME-flattening at the apex, or (b) use GoDaddy **Domain Forwarding**
-> apex → `https://www.garba.store` and put the app on `www`.
 
 ## 7. Go-live checklist
-- [ ] `https://admin.garba.store` loads and you can log in.
-- [ ] Changed the default owner/staff passwords.
-- [ ] Add a product with an image → image displays (confirms R2 wiring).
-- [ ] Print a 50×25 label (confirms PDF path).
-- [ ] Install the PWA from the browser menu (HTTPS enables this).
+- [ ] `https://admin.garba.store` loads and login works.
+- [ ] Changed default owner/staff passwords.
+- [ ] Add a product with an image → image displays (confirms R2).
+- [ ] Create a test invoice + open its PDF; print a 50×25 label (confirms pdfkit).
+- [ ] Install the PWA from the browser menu.
 
 ## Costs & limits
-- **₹0/month** on these free tiers. Domain already owned.
-- Render free **spins down after ~15 min idle** → the first request after a quiet spell takes ~30–50s. For a shop
-  open during business hours this is usually fine; if not, upgrade Render to **Starter (~$7/mo, always-on)** or move
-  to **Cloud Run** (pay-per-use, scales to zero, no fixed cost) using the Dockerfile.
-- Atlas M0 is 512 MB — plenty for a single shop's catalogue/invoices for a long time.
+- **₹0/month** on free tiers. Render free spins down after idle (first hit ~30–50 s); upgrade to Starter
+  (~$7/mo, always-on) or use **Cloud Run** (Dockerfile ready) to avoid cold starts.
+- Atlas M0 = 512 MB — plenty for one shop for a long time.
 
 ## Later: the customer storefront
-When the storefront app is built (roadmap in `docs/SUPER_PROMPT.md`), it takes the apex `garba.store` (+ `www`),
-the admin app stays on `admin.garba.store`, and `CORS_ORIGINS` gains the storefront origin. Same Atlas + R2.
+Takes the apex `garba.store` (+ `www`); the admin app stays on `admin.garba.store`; add the storefront origin to
+`CORS_ORIGINS`. Same Atlas + R2 + Render.

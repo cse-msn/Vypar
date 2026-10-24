@@ -139,7 +139,9 @@ Seed logins: owner `owner@mnm.fashion`/`owner123`, staff `staff@mnm.fashion`/`st
 
 ## 8. Project skills (`.claude/skills/`)
 
-`dev`, `seed`, `check`, `label`, `store-api`, `add-product-field`, `add-endpoint`. Invoke by name when the task matches.
+`dev`, `seed`, `check`, `deploy`, `label`, `billing`, `purchases`, `customers`, `invoices`, `reports`,
+`store-api`, `add-product-field`, `add-endpoint`. Invoke by name when the task matches. **Keep them current:**
+when a feature changes, update its skill in the same change; add a new skill for a new feature area.
 
 ## 9. Housekeeping / known items
 
