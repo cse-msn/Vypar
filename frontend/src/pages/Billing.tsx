@@ -165,7 +165,7 @@ export default function Billing() {
       }
       return [
         ...prev,
-        { key: newKey(), product, variant, quantity: 1, price: variant.sellingPrice ?? product.sellingPrice ?? 0 },
+        { key: newKey(), product, variant, quantity: 1, price: variant.sellingPrice ?? product.b2cPrice ?? product.sellingPrice ?? 0 },
       ];
     });
     // Default the bill's GST% from the product's tax rate (only if not set yet).

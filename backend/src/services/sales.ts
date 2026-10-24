@@ -69,7 +69,7 @@ export async function createInvoice(
     const variant = product.variants.id(line.variantId);
     if (!variant) throw ApiError.badRequest(`Variant not found in design ${product.designNumber}`);
 
-    const price = round2(line.price ?? variant.sellingPrice ?? product.sellingPrice ?? 0);
+    const price = round2(line.price ?? variant.sellingPrice ?? product.b2cPrice ?? product.sellingPrice ?? 0);
     const discount = round2(line.discount ?? 0);
     const amount = round2(price * line.quantity - discount);
     if (amount < 0) throw ApiError.badRequest('Line discount cannot exceed the line total');
