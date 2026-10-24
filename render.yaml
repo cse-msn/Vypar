@@ -9,7 +9,10 @@ services:
     region: singapore          # closest free region to India
     plan: free                 # spins down after ~15 min idle (first request is slow)
     branch: main
-    buildCommand: npm install && npm run build   # builds BOTH backend + frontend
+    # NODE_ENV=production makes npm skip devDependencies, but the build needs them
+    # (typescript, vite, tsx). --include=dev forces them; npm ci uses the committed lockfile
+    # (TypeScript 5.9.3) so the local tsc is used, not Render's newer global one.
+    buildCommand: npm ci --include=dev && npm run build   # builds BOTH backend + frontend
     startCommand: npm run start -w backend       # serves API + website on one port
     healthCheckPath: /api/health
     autoDeploy: true
