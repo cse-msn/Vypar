@@ -28,7 +28,7 @@ export default function RefundPolicy() {
           <h2 className="font-semibold text-gray-900">4. How to Contact Us</h2>
           <p>For any queries related to exchanges or general questions, please reach out to us:</p>
           <p className="mt-2">
-            📞 Phone: <a href="tel:+918208683401" className="text-[#A61E57] underline">8208683401</a>
+            📞 Phone: <a href="tel:+918208683401" className="text-[#A61E57] underline">82 08 68 34 01</a>
             <br />
             📧 Email: <a href="mailto:m.m.boutique.pune@gmail.com" className="text-[#A61E57] underline">m.m.boutique.pune@gmail.com</a>
           </p>
