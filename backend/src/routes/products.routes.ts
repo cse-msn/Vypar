@@ -55,6 +55,26 @@ const productInput = z.object({
   sellingPrice: z.coerce.number().min(0).default(0),
   b2bPrice: z.coerce.number({ invalid_type_error: 'B2B price is required' }).min(0),
   b2cPrice: z.coerce.number({ invalid_type_error: 'B2C price is required' }).min(0),
+  compareAtPrice: z.coerce.number().min(0).optional(),
+  // Shopify-style merchandising
+  status: z.enum(['active', 'draft', 'archived']).optional(),
+  productType: z.string().trim().optional(),
+  tags: z.array(z.string().trim()).optional(),
+  collections: z.array(z.string().trim()).optional(),
+  allowBackorder: z.boolean().optional(),
+  // Shipping
+  requiresShipping: z.boolean().optional(),
+  weight: z.coerce.number().min(0).optional(),
+  weightUnit: z.enum(['kg', 'g']).optional(),
+  length: z.coerce.number().min(0).optional(),
+  width: z.coerce.number().min(0).optional(),
+  height: z.coerce.number().min(0).optional(),
+  dimensionUnit: z.enum(['cm', 'in']).optional(),
+  countryOfOrigin: z.string().trim().optional(),
+  // SEO
+  seoTitle: z.string().trim().optional(),
+  seoDescription: z.string().trim().optional(),
+  handle: z.string().trim().optional(),
   variants: z.array(variantInput).default([]),
 });
 

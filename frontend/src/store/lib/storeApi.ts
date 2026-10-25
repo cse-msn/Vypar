@@ -123,9 +123,21 @@ export interface StoreProduct {
   images: string[];
   videos: string[];
   price: number;
+  compareAtPrice?: number;
   sizeGroup?: string;
+  tags?: string[];
+  handle?: string;
   variants: StoreVariant[];
   inStock: boolean;
+}
+
+export interface StoreCollection {
+  id: string;
+  title: string;
+  handle: string;
+  description?: string;
+  image?: string;
+  featured: boolean;
 }
 export interface StoreOrder {
   _id: string;

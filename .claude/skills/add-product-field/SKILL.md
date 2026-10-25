@@ -21,6 +21,10 @@ A product field must be wired through every layer or it silently won't save. Tou
 ## Patterns already in the form
 - **Dropdown from data:** category, sub-category, size group, and blouse-size pull options from constants or `useSizeGroups()`. Keep an existing saved value selectable even if it's no longer in the list.
 - **Required field:** add a zod `.min(1, 'X is required')`, include in `defaultValues`, and render `errors.x` under the input (see B2B/B2C price).
+- **Non-RHF state fields:** some fields are component state, not RHF — `images`/`videos`, `customFields`, `collectionsSel` (collection pill multi-select), and the `requiresShipping`/`allowBackorder` checkboxes. Init them in the edit-mode effect and include them in the `base` payload.
+
+## Shopify-style fields already present
+The form has cards for **Organisation & pricing** (status [active/draft/archived — drives the storefront-visible `active` flag], productType, compareAtPrice [MRP strikethrough], tags, collections), **Shipping** (requiresShipping, allowBackorder, weight+unit, L/W/H+unit, countryOfOrigin), and **SEO** (seoTitle, seoDescription, handle [auto-slugged in the Product pre-validate hook]). The public serializer (`store/products.routes.ts` `toPublic`) exposes `compareAtPrice`, `tags`, `handle` to the storefront.
 
 ## Verify
 `npm run typecheck -w backend` and `-w frontend` (both are clean gates now). If it affects tags, also check the label (`label` skill).

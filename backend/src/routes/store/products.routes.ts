@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { validateQuery } from '../../middleware/validate';
 import { ApiError } from '../../utils/ApiError';
+import { Types } from 'mongoose';
 import { Product, type ProductDoc } from '../../models/Product';
+import { Collection } from '../../models/Collection';
 import { paginationSchema, paginate, buildMeta } from '../../utils/pagination';
 import { escapeRegex } from '../../utils/regex';
 
@@ -32,7 +34,10 @@ function toPublic(p: ProductDoc) {
     images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
     videos: p.videos ?? [],
     price: p.b2cPrice ?? p.sellingPrice ?? 0,
+    compareAtPrice: p.compareAtPrice && p.compareAtPrice > (p.b2cPrice ?? p.sellingPrice ?? 0) ? p.compareAtPrice : undefined,
     sizeGroup: p.sizeGroup,
+    tags: p.tags ?? [],
+    handle: p.handle,
     variants,
     inStock: variants.some((v) => v.inStock),
   };
@@ -43,6 +48,7 @@ router.get(
   validateQuery(
     paginationSchema.extend({
       category: z.string().optional(),
+      collection: z.string().optional(),
       inStock: z.coerce.boolean().optional(),
     }),
   ),
@@ -52,10 +58,19 @@ router.get(
       limit: number;
       search?: string;
       category?: string;
+      collection?: string;
       inStock?: boolean;
     };
     const filter: Record<string, unknown> = { active: true };
     if (q.category) filter.category = q.category;
+    if (q.collection) {
+      // Accept a collection handle or id.
+      const col = await Collection.findOne({
+        active: true,
+        $or: [{ handle: q.collection.toLowerCase() }, ...(Types.ObjectId.isValid(q.collection) ? [{ _id: q.collection }] : [])],
+      });
+      filter.collections = col ? col._id : null; // unknown handle → no results
+    }
     if (q.inStock) filter['variants.quantity'] = { $gt: 0 };
     if (q.search) {
       const rx = new RegExp(escapeRegex(q.search), 'i');

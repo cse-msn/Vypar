@@ -85,7 +85,17 @@ export default function Product() {
       <div>
         <p className="text-xs uppercase tracking-wide text-gray-400">{p.category}{p.subCategory ? ` · ${p.subCategory}` : ''}</p>
         <h1 className="mt-1 text-2xl font-bold">{p.name}</h1>
-        <p className="mt-2 text-2xl font-semibold text-[#A61E57]">{formatCurrency(p.price)}</p>
+        <div className="mt-2 flex items-baseline gap-3">
+          <span className="text-2xl font-semibold text-[#A61E57]">{formatCurrency(p.price)}</span>
+          {!!p.compareAtPrice && p.compareAtPrice > p.price && (
+            <>
+              <span className="text-lg text-gray-400 line-through">{formatCurrency(p.compareAtPrice)}</span>
+              <span className="rounded-full bg-[#A61E57]/10 px-2 py-0.5 text-sm font-semibold text-[#A61E57]">
+                {Math.round(((p.compareAtPrice - p.price) / p.compareAtPrice) * 100)}% off
+              </span>
+            </>
+          )}
+        </div>
         {p.description && <p className="mt-4 text-sm leading-relaxed text-gray-600">{p.description}</p>}
 
         {/* Colour */}

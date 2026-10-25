@@ -12,6 +12,7 @@ import { useProduct } from '@/hooks/products';
 import { useSuppliers } from '@/hooks/suppliers';
 import { useSizeGroups } from '@/hooks/sizeGroups';
 import { useColors } from '@/hooks/colors';
+import { useCollections } from '@/hooks/collections';
 import { PageHeader } from '@/components/PageHeader';
 import { MediaManager } from '@/components/MediaManager';
 import { CustomFieldsEditor } from '@/components/CustomFieldsEditor';
@@ -102,6 +103,21 @@ const schema = z.object({
   description: z.string().optional(),
   costPrice: z.string().optional(),
   sellingPrice: z.string().optional(),
+  // Shopify-style merchandising / shipping / SEO
+  compareAtPrice: z.string().optional(),
+  status: z.string().optional(),
+  productType: z.string().optional(),
+  tags: z.string().optional(),
+  weight: z.string().optional(),
+  weightUnit: z.string().optional(),
+  length: z.string().optional(),
+  width: z.string().optional(),
+  height: z.string().optional(),
+  dimensionUnit: z.string().optional(),
+  countryOfOrigin: z.string().optional(),
+  seoTitle: z.string().optional(),
+  seoDescription: z.string().optional(),
+  handle: z.string().optional(),
   variants: z.array(variantSchema).default([]),
 });
 
@@ -148,10 +164,14 @@ export default function ProductForm() {
   const sizeGroupOptions = (sizeGroups ?? []).map((g) => g.name);
   const { data: colors } = useColors();
   const colorNames = (colors ?? []).map((c) => c.name);
+  const { data: collections } = useCollections();
 
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
+  const [collectionsSel, setCollectionsSel] = useState<string[]>([]);
+  const [requiresShipping, setRequiresShipping] = useState(true);
+  const [allowBackorder, setAllowBackorder] = useState(false);
   // Once the user edits a price by hand, stop auto-deriving it from the purchase price.
   const [b2bTouched, setB2bTouched] = useState(false);
   const [b2cTouched, setB2cTouched] = useState(false);
@@ -168,7 +188,7 @@ export default function ProductForm() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { designNumber: '', name: '', unit: 'Pcs', costPrice: '', sellingPrice: '', b2bPrice: '', b2cPrice: '', variants: [{ ...emptyVariant }] },
+    defaultValues: { designNumber: '', name: '', unit: 'Pcs', costPrice: '', sellingPrice: '', b2bPrice: '', b2cPrice: '', status: 'active', weightUnit: 'kg', dimensionUnit: 'cm', variants: [{ ...emptyVariant }] },
   });
 
   const { fields, append, remove, replace } = useFieldArray({ control, name: 'variants' });
@@ -201,6 +221,20 @@ export default function ProductForm() {
         description: product.description ?? '',
         costPrice: product.costPrice ? String(product.costPrice) : '',
         sellingPrice: product.sellingPrice ? String(product.sellingPrice) : '',
+        compareAtPrice: product.compareAtPrice != null ? String(product.compareAtPrice) : '',
+        status: product.status ?? 'active',
+        productType: product.productType ?? '',
+        tags: (product.tags ?? []).join(', '),
+        weight: product.weight != null ? String(product.weight) : '',
+        weightUnit: product.weightUnit ?? 'kg',
+        length: product.length != null ? String(product.length) : '',
+        width: product.width != null ? String(product.width) : '',
+        height: product.height != null ? String(product.height) : '',
+        dimensionUnit: product.dimensionUnit ?? 'cm',
+        countryOfOrigin: product.countryOfOrigin ?? '',
+        seoTitle: product.seoTitle ?? '',
+        seoDescription: product.seoDescription ?? '',
+        handle: product.handle ?? '',
         variants: product.variants.map((v) => ({
           _id: v._id,
           color: v.color,
@@ -215,6 +249,9 @@ export default function ProductForm() {
       setCustomFields(product.customFields ?? []);
       setImages(product.images?.length ? product.images : product.imageUrl ? [product.imageUrl] : []);
       setVideos(product.videos ?? []);
+      setCollectionsSel((product.collections ?? []).map((c) => (typeof c === 'string' ? c : c._id)));
+      setRequiresShipping(product.requiresShipping ?? true);
+      setAllowBackorder(product.allowBackorder ?? false);
       // Existing product already has its own B2B/B2C — don't auto-overwrite them from purchase price.
       if (product.b2bPrice != null) setB2bTouched(true);
       if (product.b2cPrice != null) setB2cTouched(true);
@@ -291,6 +328,24 @@ export default function ProductForm() {
       // Retail (selling) price mirrors B2C — the "Selling price" field was removed, so B2C is
       // the customer price used on cards, billing defaults and reports.
       sellingPrice: toNum(values.b2cPrice) ?? toNum(values.sellingPrice) ?? grid.salePrice ?? 0,
+      // Merchandising / shipping / SEO
+      compareAtPrice: toNum(values.compareAtPrice),
+      status: values.status || 'active',
+      productType: values.productType || undefined,
+      tags: (values.tags || '').split(',').map((t) => t.trim()).filter(Boolean),
+      collections: collectionsSel,
+      allowBackorder,
+      requiresShipping,
+      weight: toNum(values.weight),
+      weightUnit: values.weightUnit || 'kg',
+      length: toNum(values.length),
+      width: toNum(values.width),
+      height: toNum(values.height),
+      dimensionUnit: values.dimensionUnit || 'cm',
+      countryOfOrigin: values.countryOfOrigin || undefined,
+      seoTitle: values.seoTitle || undefined,
+      seoDescription: values.seoDescription || undefined,
+      handle: values.handle || undefined,
     };
 
     try {
@@ -650,6 +705,113 @@ export default function ProductForm() {
               <p className="mt-1 text-xs text-muted-foreground">Auto-set to 210% of purchase price — edit if needed.</p>
             </div>
             <div className="sm:col-span-2"><Label>Description</Label><Textarea {...register('description')} /></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Organisation &amp; pricing</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>Status</Label>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select value={field.value || 'active'} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active (visible online)</SelectItem>
+                      <SelectItem value="draft">Draft (hidden)</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Only Active products show on the online store.</p>
+            </div>
+            <div><Label>Product type</Label><Input placeholder="e.g. Lehenga" {...register('productType')} /></div>
+            <div>
+              <Label>Compare-at price (MRP) ₹</Label>
+              <Input type="text" inputMode="decimal" placeholder="struck-through price" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('compareAtPrice')} />
+              <p className="mt-1 text-xs text-muted-foreground">Shows as a strikethrough next to the selling price.</p>
+            </div>
+            <div><Label>Tags (comma-separated)</Label><Input placeholder="festive, new, cotton" {...register('tags')} /></div>
+            <div className="sm:col-span-2">
+              <Label>Collections</Label>
+              {collections?.length ? (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {collections.map((c) => {
+                    const on = collectionsSel.includes(c._id);
+                    return (
+                      <button
+                        type="button"
+                        key={c._id}
+                        onClick={() => setCollectionsSel(on ? collectionsSel.filter((x) => x !== c._id) : [...collectionsSel, c._id])}
+                        className={cn('rounded-full border px-3 py-1 text-sm', on ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground')}
+                      >
+                        {c.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">No collections yet — create them under Collections.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Shipping</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" checked={requiresShipping} onChange={(e) => setRequiresShipping(e.target.checked)} className="h-4 w-4" />
+              This is a physical product (requires shipping)
+            </label>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input type="checkbox" checked={allowBackorder} onChange={(e) => setAllowBackorder(e.target.checked)} className="h-4 w-4" />
+              Continue selling when out of stock (backorders)
+            </label>
+            {requiresShipping && (
+              <>
+                <div className="flex gap-2">
+                  <div className="flex-1"><Label>Weight</Label><Input type="text" inputMode="decimal" placeholder="0" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('weight')} /></div>
+                  <div className="w-24">
+                    <Label>Unit</Label>
+                    <Controller control={control} name="weightUnit" render={({ field }) => (
+                      <Select value={field.value || 'kg'} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="kg">kg</SelectItem><SelectItem value="g">g</SelectItem></SelectContent>
+                      </Select>
+                    )} />
+                  </div>
+                </div>
+                <div><Label>Country of origin</Label><Input placeholder="India" {...register('countryOfOrigin')} /></div>
+                <div className="sm:col-span-2 grid grid-cols-4 gap-2">
+                  <div><Label className="text-xs">Length</Label><Input type="text" inputMode="decimal" placeholder="L" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('length')} /></div>
+                  <div><Label className="text-xs">Width</Label><Input type="text" inputMode="decimal" placeholder="W" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('width')} /></div>
+                  <div><Label className="text-xs">Height</Label><Input type="text" inputMode="decimal" placeholder="H" onKeyDown={blockNonNumericKeys} onPaste={sanitizeNumericPaste} {...register('height')} /></div>
+                  <div>
+                    <Label className="text-xs">Unit</Label>
+                    <Controller control={control} name="dimensionUnit" render={({ field }) => (
+                      <Select value={field.value || 'cm'} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="cm">cm</SelectItem><SelectItem value="in">in</SelectItem></SelectContent>
+                      </Select>
+                    )} />
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Search engine listing (SEO)</CardTitle></CardHeader>
+          <CardContent className="grid gap-4">
+            <div><Label>Page title</Label><Input placeholder="Defaults to the product name" {...register('seoTitle')} /></div>
+            <div><Label>Meta description</Label><Textarea rows={2} placeholder="Short description shown in Google results" {...register('seoDescription')} /></div>
+            <div><Label>URL handle</Label><Input placeholder="auto-generated from the name" {...register('handle')} /></div>
           </CardContent>
         </Card>
 

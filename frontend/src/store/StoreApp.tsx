@@ -9,6 +9,7 @@ import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Orders from './pages/Orders';
+import Collection from './pages/Collection';
 import Contact from './pages/Contact';
 import RefundPolicy from './pages/RefundPolicy';
 import Terms from './pages/Terms';
@@ -22,6 +23,7 @@ export default function StoreApp() {
           <Route element={<StoreLayout />}>
             <Route index element={<Home />} />
             <Route path="product/:id" element={<Product />} />
+            <Route path="collection/:handle" element={<Collection />} />
             <Route path="cart" element={<Cart />} />
             <Route path="checkout" element={<Checkout />} />
             <Route path="login" element={<Login />} />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { storeApi, trackEvent, type StoreProduct } from '../lib/storeApi';
-import { formatCurrency } from '@/lib/format';
+import { storeApi, trackEvent, type StoreProduct, type StoreCollection } from '../lib/storeApi';
+import { ProductCard } from '../components/ProductCard';
 
 export default function Home() {
   const [params, setParams] = useSearchParams();
@@ -9,11 +9,15 @@ export default function Home() {
   const category = params.get('category') ?? '';
   const [products, setProducts] = useState<StoreProduct[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [collections, setCollections] = useState<StoreCollection[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const browsing = !!q || !!category;
 
   useEffect(() => {
     trackEvent('page_view', { path: '/shop' });
     storeApi.get('/products/categories').then((r) => setCategories(r.data.data as string[])).catch(() => undefined);
+    storeApi.get('/collections', { params: { featured: true } }).then((r) => setCollections(r.data.data as StoreCollection[])).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -29,11 +33,41 @@ export default function Home() {
     const next = new URLSearchParams(params);
     if (c) next.set('category', c);
     else next.delete('category');
+    next.delete('q');
     setParams(next);
   };
 
   return (
     <div>
+      {/* Hero — only on the default landing view */}
+      {!browsing && (
+        <div className="mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-[#A61E57] to-[#d64c84] px-6 py-10 text-white sm:px-10 sm:py-14">
+          <h1 className="text-2xl font-bold sm:text-4xl">MNM Fashion</h1>
+          <p className="mt-2 max-w-lg text-sm text-white/90 sm:text-base">
+            Festive chaniya cholis, kurtas, kediyas &amp; more — handpicked in Wagholi, Pune. Cash on delivery available.
+          </p>
+        </div>
+      )}
+
+      {/* Featured collections */}
+      {!browsing && collections.length > 0 && (
+        <div className="mb-6">
+          <h2 className="mb-3 text-lg font-semibold">Shop by collection</h2>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {collections.map((c) => (
+              <Link
+                key={c.id}
+                to={`/shop/collection/${c.handle}`}
+                className="relative flex h-28 w-44 shrink-0 items-end overflow-hidden rounded-xl border bg-gray-100 p-3"
+              >
+                {c.image && <img src={c.image} alt={c.title} className="absolute inset-0 h-full w-full object-cover" />}
+                <span className="relative rounded bg-white/90 px-2 py-1 text-sm font-semibold">{c.title}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Category chips */}
       <div className="mb-5 flex flex-wrap gap-2">
         <Chip active={!category} onClick={() => setCategory('')}>All</Chip>
@@ -52,26 +86,7 @@ export default function Home() {
         <p className="py-20 text-center text-gray-500">No products found{q ? ` for “${q}”` : ''}.</p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {products.map((p) => (
-            <Link
-              key={p.id}
-              to={`/shop/product/${p.id}`}
-              className="group overflow-hidden rounded-xl border bg-white transition hover:shadow-md"
-            >
-              <div className="aspect-square overflow-hidden bg-gray-100">
-                {p.images[0] ? (
-                  <img src={p.images[0]} alt={p.name} className="h-full w-full object-cover transition group-hover:scale-105" />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-gray-300">No image</div>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="truncate text-sm font-medium">{p.name}</p>
-                <p className="truncate text-xs text-gray-500">{p.category}</p>
-                <p className="mt-1 font-semibold text-[#A61E57]">{formatCurrency(p.price)}</p>
-              </div>
-            </Link>
-          ))}
+          {products.map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
       )}
     </div>

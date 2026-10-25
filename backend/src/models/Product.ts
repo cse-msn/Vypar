@@ -60,7 +60,30 @@ export interface IProduct {
   sellingPrice: number;
   b2bPrice?: number;
   b2cPrice?: number;
+  /** "Compare-at" / MRP — the struck-through original price shown next to the selling price. */
+  compareAtPrice?: number;
   variants: Types.DocumentArray<IVariant>;
+  // Shopify-style merchandising fields
+  status: string; // 'active' | 'draft' | 'archived'
+  productType?: string;
+  tags: string[];
+  collections: Types.ObjectId[];
+  /** Keep selling after stock hits zero (backorders). */
+  allowBackorder: boolean;
+  // Shipping attributes
+  requiresShipping: boolean;
+  weight?: number;
+  weightUnit: string; // 'kg' | 'g'
+  length?: number;
+  width?: number;
+  height?: number;
+  dimensionUnit: string; // 'cm' | 'in'
+  countryOfOrigin?: string;
+  // SEO
+  seoTitle?: string;
+  seoDescription?: string;
+  /** URL handle for the storefront, e.g. "246-anarkali". Unique when set. */
+  handle?: string;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -120,7 +143,24 @@ const productSchema = new Schema<IProduct>(
     sellingPrice: { type: Number, default: 0, min: 0 },
     b2bPrice: { type: Number, min: 0 },
     b2cPrice: { type: Number, min: 0 },
+    compareAtPrice: { type: Number, min: 0 },
     variants: { type: [variantSchema], default: [] },
+    status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active', index: true },
+    productType: { type: String, trim: true },
+    tags: { type: [String], default: [] },
+    collections: { type: [{ type: Schema.Types.ObjectId, ref: 'Collection' }], default: [], index: true },
+    allowBackorder: { type: Boolean, default: false },
+    requiresShipping: { type: Boolean, default: true },
+    weight: { type: Number, min: 0 },
+    weightUnit: { type: String, enum: ['kg', 'g'], default: 'kg' },
+    length: { type: Number, min: 0 },
+    width: { type: Number, min: 0 },
+    height: { type: Number, min: 0 },
+    dimensionUnit: { type: String, enum: ['cm', 'in'], default: 'cm' },
+    countryOfOrigin: { type: String, trim: true },
+    seoTitle: { type: String, trim: true },
+    seoDescription: { type: String, trim: true },
+    handle: { type: String, trim: true, lowercase: true, index: { unique: true, sparse: true } },
     active: { type: Boolean, default: true },
   },
   { timestamps: true },
@@ -143,6 +183,20 @@ productSchema.pre('validate', async function () {
   // Base code is assigned once, from a global counter starting at 200001.
   if (this.code == null) {
     this.code = 200000 + (await nextSequence('productCode'));
+  }
+
+  // Keep the legacy `active` flag in sync with Shopify-style status so storefront
+  // queries (which filter active:true) hide draft/archived products.
+  this.active = this.status === 'active';
+
+  // Derive a URL handle once, from the code + a slug of the name.
+  if (!this.handle) {
+    const slug = (this.name || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+    this.handle = slug ? `${this.code}-${slug}` : String(this.code);
   }
 
   for (const v of this.variants) {

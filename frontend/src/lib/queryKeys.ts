@@ -28,6 +28,8 @@ export const qk = {
 
   shipping: ['shipping'] as const,
 
+  collections: ['collections'] as const,
+
   invoices: ['invoices'] as const,
   invoiceList: (params?: unknown) => ['invoices', 'list', params] as const,
   invoice: (id: string) => ['invoices', 'detail', id] as const,

@@ -66,9 +66,41 @@ export interface Product {
   customFields?: CustomField[];
   costPrice: number;
   sellingPrice: number;
+  compareAtPrice?: number;
   variants: Variant[];
   totalStock: number;
+  // Shopify-style merchandising / shipping / SEO
+  status?: 'active' | 'draft' | 'archived';
+  productType?: string;
+  tags?: string[];
+  collections?: (string | { _id: string })[];
+  allowBackorder?: boolean;
+  requiresShipping?: boolean;
+  weight?: number;
+  weightUnit?: string;
+  length?: number;
+  width?: number;
+  height?: number;
+  dimensionUnit?: string;
+  countryOfOrigin?: string;
+  seoTitle?: string;
+  seoDescription?: string;
+  handle?: string;
   active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Collection {
+  _id: string;
+  title: string;
+  handle: string;
+  description?: string;
+  image?: string;
+  sortOrder: number;
+  featured: boolean;
+  active: boolean;
+  productCount?: number;
   createdAt: string;
   updatedAt: string;
 }
