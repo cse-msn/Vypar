@@ -10,7 +10,13 @@ description: Work on MNM Fashion reports & dashboard — sales (chart + top prod
   into a `charts` chunk). Query keys: `qk.dashboard`, `qk.reportSales(params)`, `qk.reportInventory`,
   `qk.reportFinancial(params)` in `frontend/src/lib/queryKeys.ts`.
 - **Backend:** `backend/src/routes/reports.routes.ts` — the aggregation endpoints (dashboard summary, sales over a
-  date range + top products, inventory valuation / low-stock, financial receivables/payables).
+  date range + top products, inventory valuation / low-stock, financial receivables/payables, and **online-store
+  analytics**).
+- **Online-store analytics:** `GET /reports/store-analytics` (date range; defaults to last 30 days) aggregates the
+  storefront's own data — `Order` (revenue, AOV, by-status, by-payment [COD vs online], daily revenue, top online
+  products, new-vs-returning customers) + `StoreEvent` (the journey funnel view→cart→checkout→purchase, conversion
+  rate, cart-abandonment). Hook `useStoreAnalytics` (`hooks/reports.ts`), shown in the Reports "Online store" tab.
+  First-party only — no third-party trackers.
 
 ## Conventions
 - These are **read-only aggregations** (MongoDB aggregation pipelines over invoices/products/payments/purchases).

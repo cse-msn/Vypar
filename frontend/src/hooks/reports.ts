@@ -58,6 +58,23 @@ export function useFinancialReport(params: { from?: string; to?: string } = {}) 
   });
 }
 
+export interface StoreAnalytics {
+  summary: { revenue: number; orders: number; units: number; avgOrderValue: number; conversionRate: number; cartAbandonmentRate: number };
+  byStatus: { status: string; count: number }[];
+  byPayment: { method: string; count: number; revenue: number }[];
+  daily: { date: string; total: number; count: number }[];
+  topProducts: { designNumber: string; productName: string; quantity: number; amount: number }[];
+  customers: { new: number; returning: number };
+  funnel: { page_view: number; view_product: number; add_to_cart: number; begin_checkout: number; purchase: number };
+}
+
+export function useStoreAnalytics(params: { from?: string; to?: string } = {}) {
+  return useQuery({
+    queryKey: ['reports', 'store-analytics', params],
+    queryFn: async () => (await api.get('/reports/store-analytics', { params })).data.data as StoreAnalytics,
+  });
+}
+
 export interface SupplierStockReport {
   generatedAt: string;
   groups: Array<{

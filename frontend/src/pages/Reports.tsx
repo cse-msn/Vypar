@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format, startOfMonth } from 'date-fns';
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { TrendingUp, Boxes, Wallet, FileText, Download, Truck } from 'lucide-react';
+import { TrendingUp, Boxes, Wallet, FileText, Download, Truck, ShoppingBag } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,15 +21,17 @@ import {
   supplierStockPdfPath,
   useStockListReport,
   stockListPdfPath,
+  useStoreAnalytics,
 } from '@/hooks/reports';
 import { useSuppliers } from '@/hooks/suppliers';
 import { openPdf } from '@/lib/pdf';
 import { getApiError } from '@/lib/api';
 import { formatCurrency, formatNumber, paymentMethodLabel } from '@/lib/format';
 
-type Tab = 'sales' | 'inventory' | 'financial' | 'supplier' | 'stocklist';
+type Tab = 'sales' | 'store' | 'inventory' | 'financial' | 'supplier' | 'stocklist';
 const TAB_LABELS: Record<Tab, string> = {
   sales: 'Sales',
+  store: 'Online store',
   inventory: 'Inventory',
   financial: 'Financial',
   supplier: 'Supplier stock',
@@ -61,7 +63,7 @@ export default function Reports() {
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div className="inline-flex rounded-lg border p-1">
-          {(['sales', 'inventory', 'financial', 'supplier', 'stocklist'] as Tab[]).map((t) => (
+          {(['sales', 'store', 'inventory', 'financial', 'supplier', 'stocklist'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -71,7 +73,7 @@ export default function Reports() {
             </button>
           ))}
         </div>
-        {(tab === 'sales' || tab === 'financial' || tab === 'supplier') && (
+        {(tab === 'sales' || tab === 'store' || tab === 'financial' || tab === 'supplier') && (
           <div className="flex items-end gap-2">
             <div>
               <Label className="text-xs">From</Label>
@@ -86,6 +88,7 @@ export default function Reports() {
       </div>
 
       {tab === 'sales' && <SalesTab range={range} />}
+      {tab === 'store' && <StoreTab range={range} />}
       {tab === 'inventory' && <InventoryTab />}
       {tab === 'financial' && <FinancialTab range={range} />}
       {tab === 'supplier' && <SupplierStockTab range={range} />}
@@ -329,6 +332,137 @@ function SalesTab({ range }: { range: { from?: string; to?: string } }) {
         <CardContent>
           {data.topProducts.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No data.</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <TableHeader>
+                  <TableRow><TableHead>Design</TableHead><TableHead>Product</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Amount</TableHead></TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.topProducts.map((p) => (
+                    <TableRow key={p.designNumber + p.productName}>
+                      <TableCell className="font-medium">{p.designNumber}</TableCell>
+                      <TableCell>{p.productName}</TableCell>
+                      <TableCell className="text-right">{p.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableWrap>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StoreTab({ range }: { range: { from?: string; to?: string } }) {
+  const { data, isLoading } = useStoreAnalytics(range);
+  if (isLoading || !data) return <Skeleton className="h-64" />;
+  const chart = (data.daily ?? []).map((d) => ({ date: d.date.slice(5), total: d.total }));
+  const f = data.funnel;
+  const funnelSteps = [
+    { label: 'Product views', value: f.view_product },
+    { label: 'Added to cart', value: f.add_to_cart },
+    { label: 'Began checkout', value: f.begin_checkout },
+    { label: 'Purchased', value: f.purchase },
+  ];
+  const maxFunnel = Math.max(1, ...funnelSteps.map((s) => s.value));
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile label="Online revenue" value={formatCurrency(data.summary.revenue)} sub={`${data.summary.orders} orders`} />
+        <Tile label="Avg order value" value={formatCurrency(data.summary.avgOrderValue)} />
+        <Tile label="Conversion rate" value={`${data.summary.conversionRate}%`} sub="purchases ÷ product views" />
+        <Tile label="Cart abandonment" value={`${data.summary.cartAbandonmentRate}%`} />
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Tile label="Units sold" value={formatNumber(data.summary.units)} />
+        <Tile label="New customers" value={formatNumber(data.customers.new)} />
+        <Tile label="Returning customers" value={formatNumber(data.customers.returning)} />
+        <Tile label="Product views" value={formatNumber(f.view_product)} />
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2 text-base"><ShoppingBag className="h-4 w-4" /> Daily online revenue</CardTitle></CardHeader>
+        <CardContent>
+          {chart.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No online orders in this range.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={chart}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                <XAxis dataKey="date" fontSize={11} />
+                <YAxis fontSize={11} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Bar dataKey="total" fill={PRIMARY} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Conversion funnel</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {funnelSteps.map((s, i) => (
+              <div key={s.label}>
+                <div className="flex justify-between text-sm">
+                  <span>{s.label}</span>
+                  <span className="font-medium">
+                    {formatNumber(s.value)}
+                    {i > 0 && funnelSteps[0].value > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">({Math.round((s.value / funnelSteps[0].value) * 100)}%)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="mt-1 h-2 rounded-full bg-muted">
+                  <div className="h-2 rounded-full bg-primary" style={{ width: `${(s.value / maxFunnel) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+            <p className="pt-1 text-xs text-muted-foreground">From first-party journey events (no third-party trackers).</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Orders by status &amp; payment</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {data.byStatus.length === 0 ? <p className="text-sm text-muted-foreground">No orders yet.</p> : data.byStatus.map((s) => (
+                <Badge key={s.status} variant="secondary">{s.status}: {s.count}</Badge>
+              ))}
+            </div>
+            {data.byPayment.length > 0 && (
+              <TableWrap>
+                <Table>
+                  <TableHeader>
+                    <TableRow><TableHead>Payment</TableHead><TableHead className="text-right">Orders</TableHead><TableHead className="text-right">Revenue</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.byPayment.map((p) => (
+                      <TableRow key={p.method}>
+                        <TableCell className="font-medium">{p.method === 'cod' ? 'Cash on delivery' : 'Online'}</TableCell>
+                        <TableCell className="text-right">{p.count}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(p.revenue)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableWrap>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Top online products</CardTitle></CardHeader>
+        <CardContent>
+          {data.topProducts.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No online sales yet.</p>
           ) : (
             <TableWrap>
               <Table>

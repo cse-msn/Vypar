@@ -10,6 +10,8 @@ import { Purchase } from '../models/Purchase';
 import { Payment } from '../models/Payment';
 import { Customer } from '../models/Customer';
 import { Supplier } from '../models/Supplier';
+import { Order } from '../models/Order';
+import { StoreEvent } from '../models/StoreEvent';
 import { round2 } from '../utils/money';
 import { buildSupplierStockReport } from '../services/supplierStock';
 import { generateSupplierStockPdf } from '../services/supplierStockPdf';
@@ -298,6 +300,119 @@ router.get(
         periodPaymentsReceived: round2(paymentAgg[0]?.total ?? 0),
         outstandingReceivable: round2(receivableAgg[0]?.total ?? 0),
         outstandingPayable: round2(payableAgg[0]?.total ?? 0),
+      },
+    });
+  }),
+);
+
+/**
+ * Online-store analytics: order revenue/AOV, status + payment breakdown, daily revenue, top online
+ * products, new-vs-returning customers, and a journey funnel (views → cart → checkout → purchase)
+ * with cart-abandonment, all from the storefront's own first-party data (Order + StoreEvent).
+ */
+router.get(
+  '/store-analytics',
+  validateQuery(dateRange),
+  asyncHandler(async (req, res) => {
+    const { from, to } = req.query as unknown as z.infer<typeof dateRange>;
+    const since = from ?? dayjs().subtract(30, 'day').startOf('day').toDate();
+    const until = to ?? dayjs().endOf('day').toDate();
+    const orderMatch = { placedAt: { $gte: since, $lte: until } };
+    const paidMatch = { ...orderMatch, status: { $ne: 'cancelled' } };
+    const eventMatch = { createdAt: { $gte: since, $lte: until } };
+
+    const [summary, byStatus, byPayment, daily, topProducts, customerSplit, funnelRaw] = await Promise.all([
+      Order.aggregate([
+        { $match: paidMatch },
+        {
+          $group: {
+            _id: null,
+            revenue: { $sum: '$total' },
+            orders: { $sum: 1 },
+            units: { $sum: { $sum: '$items.quantity' } },
+          },
+        },
+      ]),
+      Order.aggregate([{ $match: orderMatch }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Order.aggregate([
+        { $match: paidMatch },
+        { $group: { _id: '$paymentMethod', count: { $sum: 1 }, revenue: { $sum: '$total' } } },
+      ]),
+      Order.aggregate([
+        { $match: paidMatch },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$placedAt' } },
+            total: { $sum: '$total' },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      Order.aggregate([
+        { $match: paidMatch },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: { designNumber: '$items.designNumber', productName: '$items.productName' },
+            quantity: { $sum: '$items.quantity' },
+            amount: { $sum: '$items.amount' },
+          },
+        },
+        { $sort: { quantity: -1 } },
+        { $limit: 10 },
+        {
+          $project: {
+            _id: 0,
+            designNumber: '$_id.designNumber',
+            productName: '$_id.productName',
+            quantity: 1,
+            amount: { $round: ['$amount', 2] },
+          },
+        },
+      ]),
+      // New vs returning: a customer is "returning" if they have >1 non-cancelled order in the window.
+      Order.aggregate([
+        { $match: paidMatch },
+        { $group: { _id: '$customer', orders: { $sum: 1 } } },
+        { $group: { _id: null, newC: { $sum: { $cond: [{ $eq: ['$orders', 1] }, 1, 0] } }, returning: { $sum: { $cond: [{ $gt: ['$orders', 1] }, 1, 0] } } } },
+      ]),
+      StoreEvent.aggregate([{ $match: eventMatch }, { $group: { _id: '$type', count: { $sum: 1 } } }]),
+    ]);
+
+    const s = summary[0] ?? {};
+    const orders = s.orders ?? 0;
+    const revenue = round2(s.revenue ?? 0);
+    const funnel = Object.fromEntries(funnelRaw.map((f) => [f._id, f.count])) as Record<string, number>;
+    const views = funnel.view_product ?? 0;
+    const addToCart = funnel.add_to_cart ?? 0;
+    const beginCheckout = funnel.begin_checkout ?? 0;
+    const purchases = funnel.purchase ?? 0;
+    const cs = customerSplit[0] ?? {};
+
+    res.json({
+      data: {
+        summary: {
+          revenue,
+          orders,
+          units: s.units ?? 0,
+          avgOrderValue: orders ? round2(revenue / orders) : 0,
+          // Conversion: purchases per product-view (best-effort from first-party events).
+          conversionRate: views ? round2((purchases / views) * 100) : 0,
+          cartAbandonmentRate: beginCheckout ? round2(((beginCheckout - purchases) / beginCheckout) * 100) : 0,
+        },
+        byStatus: byStatus.map((x) => ({ status: x._id ?? 'unknown', count: x.count })),
+        byPayment: byPayment.map((x) => ({ method: x._id ?? 'cod', count: x.count, revenue: round2(x.revenue) })),
+        daily: daily.map((d) => ({ date: d._id, total: round2(d.total), count: d.count })),
+        topProducts,
+        customers: { new: cs.newC ?? 0, returning: cs.returning ?? 0 },
+        funnel: {
+          page_view: funnel.page_view ?? 0,
+          view_product: views,
+          add_to_cart: addToCart,
+          begin_checkout: beginCheckout,
+          purchase: purchases,
+        },
       },
     });
   }),
