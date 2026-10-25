@@ -8,11 +8,18 @@ export interface StoreCustomer {
   phone?: string;
 }
 
+export interface OtpRequestResult {
+  sent: boolean;
+  isNewCustomer: boolean;
+  hint: string;
+  devOtp?: string;
+}
+
 interface StoreAuthValue {
   customer: StoreCustomer | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (body: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
+  requestOtp: (phone: string) => Promise<OtpRequestResult>;
+  verifyOtp: (phone: string, otp: string, name?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -34,18 +41,17 @@ export function StoreAuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const r = await storeApi.post('/auth/login', { email, password, anonymousId: getAnonId() });
-    setStoreToken(r.data.data.token);
-    setCustomer(r.data.data.customer);
-    trackEvent('login');
+  const requestOtp = async (phone: string): Promise<OtpRequestResult> => {
+    const r = await storeApi.post('/auth/otp/request', { phone });
+    return r.data.data as OtpRequestResult;
   };
 
-  const register = async (body: { name: string; email: string; password: string; phone?: string }) => {
-    const r = await storeApi.post('/auth/register', { ...body, anonymousId: getAnonId() });
+  const verifyOtp = async (phone: string, otp: string, name?: string) => {
+    const r = await storeApi.post('/auth/otp/verify', { phone, otp, name, anonymousId: getAnonId() });
     setStoreToken(r.data.data.token);
-    setCustomer(r.data.data.customer);
-    trackEvent('signup');
+    const cust = r.data.data.customer as StoreCustomer;
+    setCustomer(cust);
+    trackEvent('login');
   };
 
   const logout = () => {
@@ -53,7 +59,7 @@ export function StoreAuthProvider({ children }: { children: ReactNode }) {
     setCustomer(null);
   };
 
-  return <Ctx.Provider value={{ customer, loading, login, register, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ customer, loading, requestOtp, verifyOtp, logout }}>{children}</Ctx.Provider>;
 }
 
 export function useStoreAuth(): StoreAuthValue {

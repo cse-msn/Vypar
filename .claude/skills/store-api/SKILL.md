@@ -8,12 +8,20 @@ description: Work on the MNM Fashion customer-facing online store API under /api
 The customer-facing store. Lives in `backend/src/routes/store/` and is mounted at `/api/store` by `backend/src/routes/index.ts`. It is **separate from the staff app** and does NOT use `requireAuth`.
 
 ## Customer identity (NOT staff tokens)
-- `Customer` model has a `passwordHash` (self-registration). Tokens are signed by `backend/src/services/storeAuth.ts` with claim `typ: 'customer'`.
+- **Auth is WhatsApp/phone + OTP** (no email/password). The OTP is the **last 4 digits of the number** —
+  a fixed, no-send scheme (no Meta/WhatsApp Business API). `backend/src/utils/phone.ts`
+  (`normalizePhone`, `isValidPhone`, `otpForPhone`). ⚠️ Predictable by design — NOT secure; swap in a real
+  OTP provider to harden. The number is stored on `Customer.phone` + `Customer.whatsapp` for follow-up.
+- Tokens are signed by `backend/src/services/storeAuth.ts` with claim `typ: 'customer'`. (`Customer` still
+  has a legacy `passwordHash` field, now unused by the storefront.)
 - Guards: `requireCustomer` (must be logged in) and `optionalCustomer` (attach `req.customer` if a valid token is present, else continue — for public/anonymous routes). Both in `backend/src/middleware/customerAuth.ts`.
 - A staff/owner token is rejected on store routes and vice-versa.
 
 ## Existing endpoints
-- `POST /api/store/auth/register` · `POST /api/store/auth/login` · `GET /api/store/auth/me`. Register/login accept an optional `anonymousId` to stitch a pre-login journey (see below).
+- `POST /api/store/auth/otp/request` { phone } → `{ sent, isNewCustomer, hint, devOtp? (non-prod only) }`.
+  `POST /api/store/auth/otp/verify` { phone, otp, name?, anonymousId? } → upserts the Customer by
+  phone/whatsapp and returns `{ token, customer }`. `GET /api/store/auth/me`. (`/shop/register` now just
+  redirects to the unified `/shop/login`.)
 - `GET /api/store/products` (list; `search`, `category`, `inStock`, pagination), `GET /api/store/products/categories`, `GET /api/store/products/:id`. These use `toPublic()` which exposes only customer-safe fields and the **B2C price** (`b2cPrice ?? sellingPrice`) — never cost/B2B/supplier/HSN.
 - `POST /api/store/events` — journey ingest (public, `optionalCustomer`). Batch of events with an `anonymousId`.
 - `POST /api/store/orders` · `GET /api/store/orders` · `GET /api/store/orders/:id` (`requireCustomer`). Create reserves
