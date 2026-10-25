@@ -63,8 +63,17 @@ export function StoreLayout() {
         <Outlet />
       </main>
 
-      <footer className="mt-10 border-t py-8 text-center text-sm text-gray-500">
-        MNM Fashion, Pune · <Link to="/login" className="underline">Staff login</Link>
+      <footer className="mt-10 border-t bg-white">
+        <div className="mx-auto max-w-6xl px-4 py-8">
+          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-sm font-medium text-gray-600">
+            <Link to="/shop/contact" className="hover:text-[#A61E57]">Contact Us</Link>
+            <Link to="/shop/refund-policy" className="hover:text-[#A61E57]">Refund Policy</Link>
+            <Link to="/shop/terms" className="hover:text-[#A61E57]">Terms &amp; Conditions</Link>
+          </nav>
+          <p className="mt-4 text-center text-xs text-gray-400">
+            © {new Date().getFullYear()} MNM Fashion, Wagholi, Pune · <Link to="/login" className="underline">Staff login</Link>
+          </p>
+        </div>
       </footer>
     </div>
   );

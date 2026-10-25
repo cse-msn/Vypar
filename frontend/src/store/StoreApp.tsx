@@ -9,6 +9,9 @@ import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Orders from './pages/Orders';
+import Contact from './pages/Contact';
+import RefundPolicy from './pages/RefundPolicy';
+import Terms from './pages/Terms';
 
 // Customer-facing storefront, mounted at /shop/* (public — separate from the admin app).
 export default function StoreApp() {
@@ -24,6 +27,9 @@ export default function StoreApp() {
             <Route path="login" element={<Login />} />
             <Route path="register" element={<Register />} />
             <Route path="orders" element={<Orders />} />
+            <Route path="contact" element={<Contact />} />
+            <Route path="refund-policy" element={<RefundPolicy />} />
+            <Route path="terms" element={<Terms />} />
             <Route path="*" element={<Home />} />
           </Route>
         </Routes>
