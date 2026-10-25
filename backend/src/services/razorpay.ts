@@ -34,7 +34,16 @@ export async function createRazorpayOrder(amountRupees: number, receipt: string)
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     logger.error(`Razorpay order creation failed (${res.status}): ${text}`);
-    throw ApiError.badRequest('Could not start the online payment. Please try again.');
+    // Surface Razorpay's own reason (e.g. "Authentication failed", "account not activated") — it's
+    // not sensitive and makes misconfiguration diagnosable instead of a blank "try again".
+    let reason = '';
+    try {
+      reason = (JSON.parse(text)?.error?.description as string) || '';
+    } catch {
+      /* non-JSON body */
+    }
+    if (res.status === 401) reason ||= 'Authentication failed — check RAZORPAY_KEY_ID/SECRET';
+    throw ApiError.badRequest(`Online payment could not start${reason ? `: ${reason}` : '. Please try again.'}`);
   }
   return (await res.json()) as RazorpayOrder;
 }
