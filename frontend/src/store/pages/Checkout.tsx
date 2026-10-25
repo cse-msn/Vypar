@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { storeApi, trackEvent } from '../lib/storeApi';
+import { storeApi, trackEvent, loadRazorpay, openRazorpay, type RazorpayPayment } from '../lib/storeApi';
 import { useCart } from '../CartContext';
 import { useStoreAuth } from '../StoreAuthContext';
 import { getApiError } from '@/lib/api';
@@ -17,9 +17,18 @@ export default function Checkout() {
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
   const [coupon, setCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+  const [onlineEnabled, setOnlineEnabled] = useState(false);
+  const [payMethod, setPayMethod] = useState<'cod' | 'online'>('cod');
 
   const discount = coupon?.discountAmount ?? 0;
   const total = Math.max(0, subtotal - discount);
+
+  useEffect(() => {
+    storeApi
+      .get('/config')
+      .then((r) => setOnlineEnabled(Boolean(r.data.data.onlinePayment)))
+      .catch(() => setOnlineEnabled(false));
+  }, []);
 
   const applyCode = async () => {
     const entered = code.trim();
@@ -64,8 +73,15 @@ export default function Checkout() {
 
   const place = async (e: React.FormEvent) => {
     e.preventDefault();
+    const method = onlineEnabled ? payMethod : 'cod';
     setBusy(true);
     try {
+      // Load the Razorpay script early so a popup-blocker doesn't fire after the order is created.
+      if (method === 'online') {
+        const ok = await loadRazorpay();
+        if (!ok) throw new Error('Could not load the payment window. Please try again.');
+      }
+
       const body = {
         items: items.map((i) => ({ productId: i.productId, variantId: i.variantId, quantity: i.quantity })),
         shippingAddress: {
@@ -77,20 +93,63 @@ export default function Checkout() {
           state: addr.state.trim() || undefined,
           pincode: addr.pincode.trim(),
         },
-        paymentMethod: 'cod' as const,
+        paymentMethod: method,
         notes: notes.trim() || undefined,
         discountCode: coupon?.code,
       };
       const r = await storeApi.post('/orders', body);
       const order = r.data.data;
+      const payment = r.data.payment as RazorpayPayment | null;
+
+      if (method === 'online' && payment) {
+        // Hand off to Razorpay Checkout; confirm the order only after the signed success.
+        openRazorpay({
+          key: payment.keyId,
+          amount: payment.amount,
+          currency: payment.currency,
+          order_id: payment.razorpayOrderId,
+          name: 'MNM Fashion',
+          description: `Order ${order.orderNumber}`,
+          prefill: { name: addr.name.trim(), contact: addr.phone.trim(), email: customer?.email || undefined },
+          theme: { color: '#A61E57' },
+          handler: async (resp) => {
+            try {
+              await storeApi.post(`/orders/${order._id}/verify`, {
+                razorpayPaymentId: resp.razorpay_payment_id,
+                razorpaySignature: resp.razorpay_signature,
+              });
+              trackEvent('purchase', { value: order.total });
+              clear();
+              toast.success(`Payment successful — order ${order.orderNumber} confirmed!`);
+              navigate('/shop/orders');
+            } catch (err) {
+              toast.error(getApiError(err).message);
+              navigate('/shop/orders');
+            } finally {
+              setBusy(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setBusy(false);
+              toast.message('Payment cancelled. Your order is awaiting payment — you can retry from My Orders.');
+              clear();
+              navigate('/shop/orders');
+            },
+          },
+        });
+        return; // keep busy until the Razorpay callbacks resolve
+      }
+
+      // Cash on delivery.
       trackEvent('purchase', { value: order.total });
       clear();
       toast.success(`Order ${order.orderNumber} placed!`);
       navigate('/shop/orders');
     } catch (err) {
-      toast.error(getApiError(err).message);
+      toast.error(err instanceof Error && !('response' in err) ? err.message : getApiError(err).message);
     } finally {
-      setBusy(false);
+      if (method !== 'online') setBusy(false);
     }
   };
 
@@ -98,7 +157,9 @@ export default function Checkout() {
     <form onSubmit={place} className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div>
         <h1 className="text-2xl font-bold">Checkout</h1>
-        <p className="mt-1 text-sm text-gray-500">Cash on delivery. Online payment coming soon.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          {onlineEnabled ? 'Pay online or choose cash on delivery.' : 'Cash on delivery.'}
+        </p>
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <F label="Full name" value={addr.name} onChange={set('name')} />
           <F label="Phone" value={addr.phone} onChange={set('phone')} />
@@ -146,8 +207,23 @@ export default function Checkout() {
           {discount > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{formatCurrency(discount)}</span></div>}
         </div>
         <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
+
+        {onlineEnabled && (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-semibold">Payment</p>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+              <input type="radio" name="pay" checked={payMethod === 'online'} onChange={() => setPayMethod('online')} />
+              Pay online (UPI / card / netbanking)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+              <input type="radio" name="pay" checked={payMethod === 'cod'} onChange={() => setPayMethod('cod')} />
+              Cash on delivery
+            </label>
+          </div>
+        )}
+
         <button disabled={busy} className="mt-4 w-full rounded-xl bg-[#A61E57] py-3 font-semibold text-white disabled:opacity-60">
-          {busy ? 'Placing…' : 'Place order (COD)'}
+          {busy ? 'Please wait…' : onlineEnabled && payMethod === 'online' ? `Pay ${formatCurrency(total)}` : 'Place order (COD)'}
         </button>
       </div>
     </form>

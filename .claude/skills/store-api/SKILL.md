@@ -36,9 +36,16 @@ Staff/owner manage online orders at **/orders** (`frontend/src/pages/Orders.tsx`
 `GET/PATCH /api/orders` + `POST /api/orders/:id/cancel` (`backend/src/routes/orders.routes.ts`). Update fulfilment
 status (placed→…→delivered; delivered auto-marks a COD order paid); cancel returns stock (`cancelOrder`).
 
+## Payments & discounts (built)
+- **Razorpay online payment** is built — see the `payments-online` skill. `POST /orders` returns a `payment`
+  payload for online orders; `POST /orders/:id/verify` + `POST /razorpay/webhook` confirm it; `GET /config`
+  tells the UI whether online is enabled. COD still works with no config.
+- **Coupon codes** — see the `discounts` skill. `POST /api/store/discounts/validate` previews a code;
+  `createOrder` re-validates server-side.
+
 ## Planned (not built yet) — see MEMORY `storefront-ecommerce-build`
-Razorpay online payment (needs `RAZORPAY_KEY_ID/SECRET`; COD works now); storefront UI polish; S3 media go-live;
-custom domain. The `Order` model + constants exist and orders are live (COD).
+Storefront UI polish; shipping rates; GST tax engine; collections; gift cards. Refunds via Razorpay API are
+not wired yet.
 
 ## Conventions
 Follow the same envelope as the rest of the API: lists `{ data, meta }`, single `{ data }`. Online orders must reduce inventory through `backend/src/services/stock.ts`, never ad-hoc. Never expose cost/B2B/supplier data on public routes.

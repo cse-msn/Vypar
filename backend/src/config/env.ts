@@ -60,6 +60,13 @@ const schema = z.object({
   PRICE_CODE_YEAR: z.coerce.number().int().optional(),
   // Fixed prefix for the printed tag price, formatted as: <prefix>-<B2B>-<B2C> (e.g. 10082327-450-855).
   PRICE_CODE_TAG_PREFIX: z.string().default('10082327'),
+
+  // Razorpay online payments (optional — COD works without these). When both are set, the
+  // storefront offers online payment. The webhook secret is set separately in the Razorpay
+  // dashboard and is only needed to accept server-to-server payment webhooks.
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -115,6 +122,12 @@ export const env = {
     pad: raw.PRICE_CODE_PAD,
     year: raw.PRICE_CODE_YEAR,
     tagPrefix: raw.PRICE_CODE_TAG_PREFIX,
+  },
+  razorpay: {
+    keyId: raw.RAZORPAY_KEY_ID ?? '',
+    keySecret: raw.RAZORPAY_KEY_SECRET ?? '',
+    webhookSecret: raw.RAZORPAY_WEBHOOK_SECRET ?? '',
+    configured: Boolean(raw.RAZORPAY_KEY_ID && raw.RAZORPAY_KEY_SECRET),
   },
 };
 

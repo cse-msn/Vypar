@@ -44,7 +44,15 @@ export function createApp() {
   );
 
   app.use(compression());
-  app.use(express.json({ limit: '2mb' }));
+  app.use(
+    express.json({
+      limit: '2mb',
+      // Keep the raw bytes so webhook handlers can verify provider signatures (e.g. Razorpay).
+      verify: (req, _res, buf) => {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
   app.use(express.urlencoded({ extended: true }));
   if (!env.isTest) app.use(morgan(env.isProd ? 'combined' : 'dev'));
 

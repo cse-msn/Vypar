@@ -4,8 +4,9 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { validateBody } from '../../middleware/validate';
 import { requireCustomer } from '../../middleware/customerAuth';
 import { ApiError } from '../../utils/ApiError';
+import { env } from '../../config/env';
 import { Order } from '../../models/Order';
-import { createOrder } from '../../services/orders';
+import { createOrder, confirmOnlinePayment } from '../../services/orders';
 
 const router = Router();
 router.use(requireCustomer);
@@ -37,13 +38,38 @@ const createSchema = z.object({
   discountCode: z.string().trim().optional(),
 });
 
-// Place an order (reduces stock).
+// Place an order (reduces stock). For an online (Razorpay) order the response also carries the
+// `payment` payload the client needs to open Razorpay Checkout.
 router.post(
   '/',
   validateBody(createSchema),
   asyncHandler(async (req, res) => {
     const order = await createOrder(req.customer!.id, req.body);
-    res.status(201).json({ data: order });
+    const payment =
+      order.paymentMethod === 'online' && order.razorpayOrderId
+        ? {
+            provider: 'razorpay' as const,
+            keyId: env.razorpay.keyId,
+            razorpayOrderId: order.razorpayOrderId,
+            amount: Math.round(order.total * 100),
+            currency: 'INR',
+          }
+        : null;
+    res.status(201).json({ data: order, payment });
+  }),
+);
+
+// Confirm an online payment after Razorpay Checkout succeeds (server-side signature verification).
+const verifySchema = z.object({
+  razorpayPaymentId: z.string().min(1),
+  razorpaySignature: z.string().min(1),
+});
+router.post(
+  '/:id/verify',
+  validateBody(verifySchema),
+  asyncHandler(async (req, res) => {
+    const order = await confirmOnlinePayment(req.params.id, req.customer!.id, req.body);
+    res.json({ data: order });
   }),
 );
 

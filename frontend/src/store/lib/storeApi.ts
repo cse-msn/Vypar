@@ -36,6 +36,57 @@ export function trackEvent(type: string, extra: Record<string, unknown> = {}): v
     .catch(() => undefined);
 }
 
+// ---- Razorpay Checkout ----
+export interface RazorpayPayment {
+  provider: 'razorpay';
+  keyId: string;
+  razorpayOrderId: string;
+  amount: number; // paise
+  currency: string;
+}
+
+export interface RazorpaySuccess {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  order_id: string;
+  name: string;
+  description?: string;
+  prefill?: { name?: string; contact?: string; email?: string };
+  theme?: { color?: string };
+  handler: (resp: RazorpaySuccess) => void;
+  modal?: { ondismiss?: () => void };
+}
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => { open: () => void };
+  }
+}
+
+/** Lazily inject Razorpay's hosted Checkout script. Resolves false if it can't load. */
+export function loadRazorpay(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement('script');
+    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
+
+export function openRazorpay(options: RazorpayOptions): void {
+  if (!window.Razorpay) throw new Error('Razorpay is not loaded');
+  new window.Razorpay(options).open();
+}
+
 // Per-tab session id.
 let _sid: string | undefined;
 function sessionId(): string {

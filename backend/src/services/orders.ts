@@ -3,6 +3,7 @@ import { Product } from '../models/Product';
 import { nextSequence, formatNumber } from '../models/Counter';
 import { reserveStock, releaseStock, type StockLine } from './stock';
 import { validateDiscount, recordRedemption } from './discounts';
+import { createRazorpayOrder, isRazorpayConfigured, verifyPaymentSignature } from './razorpay';
 import { ApiError } from '../utils/ApiError';
 import { round2 } from '../utils/money';
 import type { OrderPaymentMethod } from '../constants';
@@ -74,12 +75,25 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
 
   const total = round2(Math.max(0, subtotal - discount + shippingFee));
 
+  if (input.paymentMethod === 'online' && !isRazorpayConfigured()) {
+    throw ApiError.badRequest('Online payment is not available right now. Please choose Cash on Delivery.');
+  }
+
   // Reserve stock first (atomic, all-or-nothing). Throws ApiError.conflict if short.
   await reserveStock(reserve);
   try {
     const seq = await nextSequence('order');
+    const orderNumber = formatNumber('ORD', seq);
+
+    // For online payment, open a Razorpay order up front; its id links the gateway payment back.
+    let razorpayOrderId: string | undefined;
+    if (input.paymentMethod === 'online') {
+      const rzp = await createRazorpayOrder(total, orderNumber);
+      razorpayOrderId = rzp.id;
+    }
+
     const order = await Order.create({
-      orderNumber: formatNumber('ORD', seq),
+      orderNumber,
       customer: customerId,
       items,
       subtotal,
@@ -92,6 +106,7 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
       status: 'placed',
       shippingAddress: input.shippingAddress,
       notes: input.notes,
+      razorpayOrderId,
       placedAt: new Date(),
     });
     if (discountCode) await recordRedemption(discountCode).catch(() => undefined);
@@ -101,6 +116,45 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
     await releaseStock(reserve).catch(() => undefined);
     throw err;
   }
+}
+
+/**
+ * Confirm an online order once Razorpay returns a signed success to the browser. The signature is
+ * cryptographic proof from Razorpay (not a browser-trusted flag). Idempotent: a second call on an
+ * already-paid order is a no-op. Returns the updated order.
+ */
+export async function confirmOnlinePayment(
+  orderId: string,
+  customerId: string,
+  payment: { razorpayPaymentId: string; razorpaySignature: string },
+): Promise<OrderDoc> {
+  const order = await Order.findOne({ _id: orderId, customer: customerId });
+  if (!order) throw ApiError.notFound('Order not found');
+  if (order.paymentStatus === 'paid') return order; // idempotent
+  if (!order.razorpayOrderId) throw ApiError.badRequest('This order has no online payment to confirm');
+
+  const ok = verifyPaymentSignature(order.razorpayOrderId, payment.razorpayPaymentId, payment.razorpaySignature);
+  if (!ok) throw ApiError.badRequest('Payment could not be verified');
+
+  order.paymentStatus = 'paid';
+  order.status = 'confirmed';
+  order.razorpayPaymentId = payment.razorpayPaymentId;
+  order.razorpaySignature = payment.razorpaySignature;
+  await order.save();
+  return order;
+}
+
+/** Mark an order paid from a verified webhook (authoritative, idempotent). */
+export async function markOrderPaidByRazorpayOrderId(
+  razorpayOrderId: string,
+  razorpayPaymentId: string,
+): Promise<void> {
+  const order = await Order.findOne({ razorpayOrderId });
+  if (!order || order.paymentStatus === 'paid') return;
+  order.paymentStatus = 'paid';
+  if (order.status === 'placed') order.status = 'confirmed';
+  order.razorpayPaymentId = razorpayPaymentId;
+  await order.save();
 }
 
 /** Cancel an order and return its reserved stock to inventory. */
