@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { storeApi, trackEvent, loadRazorpay, openRazorpay, type RazorpayPayment } from '../lib/storeApi';
+import { storeApi, trackEvent, loadRazorpay, openRazorpay, type RazorpayPayment, type ShippingOption } from '../lib/storeApi';
 import { useCart } from '../CartContext';
 import { useStoreAuth } from '../StoreAuthContext';
 import { getApiError } from '@/lib/api';
@@ -16,12 +16,18 @@ export default function Checkout() {
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState('');
   const [applying, setApplying] = useState(false);
-  const [coupon, setCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+  const [coupon, setCoupon] = useState<{ code: string; discountAmount: number; freeShipping: boolean } | null>(null);
   const [onlineEnabled, setOnlineEnabled] = useState(false);
   const [payMethod, setPayMethod] = useState<'cod' | 'online'>('cod');
+  const [shipOptions, setShipOptions] = useState<ShippingOption[]>([]);
+  const [shipId, setShipId] = useState<string>('');
+  const [shipChecked, setShipChecked] = useState(false);
 
+  const selectedShip = shipOptions.find((o) => o.id === shipId);
   const discount = coupon?.discountAmount ?? 0;
-  const total = Math.max(0, subtotal - discount);
+  const shippingFee = coupon?.freeShipping ? 0 : selectedShip?.price ?? 0;
+  const notServiceable = shipChecked && shipOptions.length === 0;
+  const total = Math.max(0, subtotal - discount) + shippingFee;
 
   useEffect(() => {
     storeApi
@@ -30,6 +36,29 @@ export default function Checkout() {
       .catch(() => setOnlineEnabled(false));
   }, []);
 
+  // Fetch shipping options whenever the destination (state/pincode) or subtotal changes.
+  useEffect(() => {
+    const hasDest = addr.state.trim() || addr.pincode.trim().length >= 6;
+    if (!hasDest) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      storeApi
+        .post('/shipping/quote', { state: addr.state.trim(), pincode: addr.pincode.trim(), subtotal })
+        .then((r) => {
+          if (cancelled) return;
+          const opts = r.data.data as ShippingOption[];
+          setShipOptions(opts);
+          setShipChecked(true);
+          setShipId((cur) => (opts.some((o) => o.id === cur) ? cur : opts[0]?.id ?? ''));
+        })
+        .catch(() => !cancelled && setShipOptions([]));
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [addr.state, addr.pincode, subtotal]);
+
   const applyCode = async () => {
     const entered = code.trim();
     if (!entered) return;
@@ -37,7 +66,7 @@ export default function Checkout() {
     try {
       const r = await storeApi.post('/discounts/validate', { code: entered, subtotal, shippingFee: 0 });
       const d = r.data.data as { code: string; discountAmount: number; freeShipping: boolean };
-      setCoupon({ code: d.code, discountAmount: d.discountAmount });
+      setCoupon({ code: d.code, discountAmount: d.discountAmount, freeShipping: d.freeShipping });
       toast.success(`Code ${d.code} applied`);
     } catch (err) {
       setCoupon(null);
@@ -96,6 +125,7 @@ export default function Checkout() {
         paymentMethod: method,
         notes: notes.trim() || undefined,
         discountCode: coupon?.code,
+        shippingRateId: shipId || undefined,
       };
       const r = await storeApi.post('/orders', body);
       const order = r.data.data;
@@ -202,9 +232,35 @@ export default function Checkout() {
             </div>
           )}
         </div>
+        {shipOptions.length > 1 && (
+          <div className="mt-3 border-t pt-3">
+            <p className="text-sm font-semibold">Delivery</p>
+            <div className="mt-2 space-y-2">
+              {shipOptions.map((o) => (
+                <label key={o.id} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <input type="radio" name="ship" checked={shipId === o.id} onChange={() => setShipId(o.id)} />
+                    {o.label}{o.eta ? ` · ${o.eta}` : ''}
+                  </span>
+                  <span>{o.price === 0 ? 'Free' : formatCurrency(o.price)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+        {notServiceable && (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Sorry, we don't deliver to this address yet.</p>
+        )}
+
         <div className="mt-3 space-y-1 text-sm">
           <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
           {discount > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{formatCurrency(discount)}</span></div>}
+          {shipChecked && !notServiceable && (
+            <div className="flex justify-between text-gray-600">
+              <span>Shipping{selectedShip?.label ? ` (${selectedShip.label})` : ''}</span>
+              <span>{shippingFee === 0 ? 'Free' : formatCurrency(shippingFee)}</span>
+            </div>
+          )}
         </div>
         <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
 
@@ -222,7 +278,7 @@ export default function Checkout() {
           </div>
         )}
 
-        <button disabled={busy} className="mt-4 w-full rounded-xl bg-[#A61E57] py-3 font-semibold text-white disabled:opacity-60">
+        <button disabled={busy || notServiceable} className="mt-4 w-full rounded-xl bg-[#A61E57] py-3 font-semibold text-white disabled:opacity-60">
           {busy ? 'Please wait…' : onlineEnabled && payMethod === 'online' ? `Pay ${formatCurrency(total)}` : 'Place order (COD)'}
         </button>
       </div>

@@ -36,6 +36,13 @@ export function trackEvent(type: string, extra: Record<string, unknown> = {}): v
     .catch(() => undefined);
 }
 
+export interface ShippingOption {
+  id: string;
+  label: string;
+  price: number;
+  eta?: string;
+}
+
 // ---- Razorpay Checkout ----
 export interface RazorpayPayment {
   provider: 'razorpay';

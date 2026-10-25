@@ -248,6 +248,29 @@ export interface Order {
   createdAt: string;
 }
 
+export type ZoneMatchType = 'all' | 'states' | 'pincodes';
+
+export interface ShippingRate {
+  _id?: string;
+  label: string;
+  price: number;
+  freeAbove: number;
+  eta?: string;
+}
+
+export interface ShippingZone {
+  _id: string;
+  name: string;
+  matchType: ZoneMatchType;
+  states: string[];
+  pincodePrefixes: string[];
+  rates: ShippingRate[];
+  priority: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type DiscountType = 'percentage' | 'fixed' | 'free_shipping';
 
 export interface Discount {

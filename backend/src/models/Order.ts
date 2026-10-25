@@ -38,6 +38,8 @@ export interface IOrder {
   items: IOrderItem[];
   subtotal: number;
   shippingFee: number;
+  /** Shipping method label snapshot, e.g. "Standard". */
+  shippingMethod?: string;
   discount: number;
   /** Upper-cased coupon code applied to this order, if any. */
   discountCode?: string;
@@ -95,6 +97,7 @@ const orderSchema = new Schema<IOrder>(
     items: { type: [orderItemSchema], required: true },
     subtotal: { type: Number, required: true, default: 0 },
     shippingFee: { type: Number, default: 0 },
+    shippingMethod: { type: String, trim: true },
     discount: { type: Number, default: 0 },
     discountCode: { type: String, trim: true, uppercase: true, index: true },
     total: { type: Number, required: true, default: 0 },

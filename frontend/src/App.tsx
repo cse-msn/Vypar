@@ -18,6 +18,7 @@ const Invoices = lazy(() => import('@/pages/Invoices'));
 const InvoiceDetail = lazy(() => import('@/pages/InvoiceDetail'));
 const Orders = lazy(() => import('@/pages/Orders'));
 const Discounts = lazy(() => import('@/pages/Discounts'));
+const Shipping = lazy(() => import('@/pages/Shipping'));
 const Customers = lazy(() => import('@/pages/Customers'));
 const Suppliers = lazy(() => import('@/pages/Suppliers'));
 const Purchases = lazy(() => import('@/pages/Purchases'));
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="invoices/:id" element={<InvoiceDetail />} />
             <Route path="orders" element={<Orders />} />
             <Route path="discounts" element={<Discounts />} />
+            <Route path="shipping" element={<Shipping />} />
             <Route path="customers" element={<Customers />} />
             <Route path="purchases" element={<Purchases />} />
             <Route path="purchases/new" element={<PurchaseForm />} />

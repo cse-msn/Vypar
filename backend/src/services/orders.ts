@@ -3,6 +3,7 @@ import { Product } from '../models/Product';
 import { nextSequence, formatNumber } from '../models/Counter';
 import { reserveStock, releaseStock, type StockLine } from './stock';
 import { validateDiscount, recordRedemption } from './discounts';
+import { resolveShippingFee } from './shipping';
 import { createRazorpayOrder, isRazorpayConfigured, verifyPaymentSignature } from './razorpay';
 import { ApiError } from '../utils/ApiError';
 import { round2 } from '../utils/money';
@@ -21,6 +22,8 @@ export interface CreateOrderInput {
   notes?: string;
   /** Optional coupon code; re-validated on the server, client-supplied totals are ignored. */
   discountCode?: string;
+  /** Chosen shipping option id (`zoneId:rateId`); the fee is recomputed server-side. */
+  shippingRateId?: string;
 }
 
 /**
@@ -61,7 +64,11 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
   }
 
   const subtotal = round2(items.reduce((s, i) => s + i.amount, 0));
-  let shippingFee = 0; // flat free shipping for now
+
+  // Shipping fee is resolved on the server from the configured zones + the destination.
+  const shipping = await resolveShippingFee(input.shippingRateId, input.shippingAddress, subtotal);
+  let shippingFee = shipping.fee;
+  const shippingMethod = shipping.method;
 
   // Re-validate any coupon on the server and recompute the discount — never trust a client total.
   let discount = 0;
@@ -98,6 +105,7 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
       items,
       subtotal,
       shippingFee,
+      shippingMethod,
       discount,
       discountCode,
       total,
