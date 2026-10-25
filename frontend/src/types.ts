@@ -237,6 +237,7 @@ export interface Order {
   subtotal: number;
   shippingFee: number;
   discount: number;
+  discountCode?: string;
   total: number;
   paymentMethod: 'cod' | 'online';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
@@ -245,6 +246,26 @@ export interface Order {
   notes?: string;
   placedAt: string;
   createdAt: string;
+}
+
+export type DiscountType = 'percentage' | 'fixed' | 'free_shipping';
+
+export interface Discount {
+  _id: string;
+  code: string;
+  description?: string;
+  type: DiscountType;
+  value: number;
+  minSubtotal: number;
+  maxDiscount: number;
+  usageLimit: number;
+  usageCount: number;
+  perCustomerLimit: number;
+  startsAt?: string;
+  endsAt?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Paginated<T> {

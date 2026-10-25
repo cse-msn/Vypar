@@ -23,6 +23,9 @@ export const qk = {
   orderList: (params?: unknown) => ['orders', 'list', params] as const,
   order: (id: string) => ['orders', 'detail', id] as const,
 
+  discounts: ['discounts'] as const,
+  discountList: (params?: unknown) => ['discounts', 'list', params] as const,
+
   invoices: ['invoices'] as const,
   invoiceList: (params?: unknown) => ['invoices', 'list', params] as const,
   invoice: (id: string) => ['invoices', 'detail', id] as const,

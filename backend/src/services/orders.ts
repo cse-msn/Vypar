@@ -2,6 +2,7 @@ import { Order, type OrderDoc, type IShippingAddress } from '../models/Order';
 import { Product } from '../models/Product';
 import { nextSequence, formatNumber } from '../models/Counter';
 import { reserveStock, releaseStock, type StockLine } from './stock';
+import { validateDiscount, recordRedemption } from './discounts';
 import { ApiError } from '../utils/ApiError';
 import { round2 } from '../utils/money';
 import type { OrderPaymentMethod } from '../constants';
@@ -17,6 +18,8 @@ export interface CreateOrderInput {
   shippingAddress: IShippingAddress;
   paymentMethod: OrderPaymentMethod;
   notes?: string;
+  /** Optional coupon code; re-validated on the server, client-supplied totals are ignored. */
+  discountCode?: string;
 }
 
 /**
@@ -57,8 +60,19 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
   }
 
   const subtotal = round2(items.reduce((s, i) => s + i.amount, 0));
-  const shippingFee = 0; // flat free shipping for now
-  const total = round2(subtotal + shippingFee);
+  let shippingFee = 0; // flat free shipping for now
+
+  // Re-validate any coupon on the server and recompute the discount — never trust a client total.
+  let discount = 0;
+  let discountCode: string | undefined;
+  if (input.discountCode?.trim()) {
+    const applied = await validateDiscount(input.discountCode, { subtotal, shippingFee, customerId });
+    discount = applied.discountAmount;
+    if (applied.freeShipping) shippingFee = 0;
+    discountCode = applied.discount.code;
+  }
+
+  const total = round2(Math.max(0, subtotal - discount + shippingFee));
 
   // Reserve stock first (atomic, all-or-nothing). Throws ApiError.conflict if short.
   await reserveStock(reserve);
@@ -70,7 +84,8 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
       items,
       subtotal,
       shippingFee,
-      discount: 0,
+      discount,
+      discountCode,
       total,
       paymentMethod: input.paymentMethod,
       paymentStatus: 'pending',
@@ -79,6 +94,7 @@ export async function createOrder(customerId: string, input: CreateOrderInput): 
       notes: input.notes,
       placedAt: new Date(),
     });
+    if (discountCode) await recordRedemption(discountCode).catch(() => undefined);
     return order;
   } catch (err) {
     // Persisting failed — give the reserved stock back.

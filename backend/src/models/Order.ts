@@ -39,6 +39,8 @@ export interface IOrder {
   subtotal: number;
   shippingFee: number;
   discount: number;
+  /** Upper-cased coupon code applied to this order, if any. */
+  discountCode?: string;
   total: number;
   paymentMethod: OrderPaymentMethod;
   paymentStatus: OrderPaymentStatus;
@@ -94,6 +96,7 @@ const orderSchema = new Schema<IOrder>(
     subtotal: { type: Number, required: true, default: 0 },
     shippingFee: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
+    discountCode: { type: String, trim: true, uppercase: true, index: true },
     total: { type: Number, required: true, default: 0 },
     paymentMethod: { type: String, enum: ORDER_PAYMENT_METHODS, required: true },
     paymentStatus: { type: String, enum: ORDER_PAYMENT_STATUS, default: 'pending', index: true },

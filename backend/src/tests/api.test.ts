@@ -11,6 +11,8 @@ async function createProduct(overrides: Record<string, unknown> = {}) {
       category: 'Kurti',
       sellingPrice: 1200,
       costPrice: 700,
+      b2bPrice: 1120,
+      b2cPrice: 1470,
       variants: [
         { color: 'Red', size: '36', quantity: 10, sellingPrice: 1200 },
         { color: 'Blue', size: '38', quantity: 5 },

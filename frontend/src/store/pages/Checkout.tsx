@@ -14,6 +14,34 @@ export default function Checkout() {
   const [addr, setAddr] = useState({ name: '', phone: '', line1: '', line2: '', city: '', state: '', pincode: '' });
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState('');
+  const [applying, setApplying] = useState(false);
+  const [coupon, setCoupon] = useState<{ code: string; discountAmount: number } | null>(null);
+
+  const discount = coupon?.discountAmount ?? 0;
+  const total = Math.max(0, subtotal - discount);
+
+  const applyCode = async () => {
+    const entered = code.trim();
+    if (!entered) return;
+    setApplying(true);
+    try {
+      const r = await storeApi.post('/discounts/validate', { code: entered, subtotal, shippingFee: 0 });
+      const d = r.data.data as { code: string; discountAmount: number; freeShipping: boolean };
+      setCoupon({ code: d.code, discountAmount: d.discountAmount });
+      toast.success(`Code ${d.code} applied`);
+    } catch (err) {
+      setCoupon(null);
+      toast.error(getApiError(err).message);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const removeCode = () => {
+    setCoupon(null);
+    setCode('');
+  };
 
   useEffect(() => {
     if (!loading && !customer) navigate('/shop/login?next=/shop/checkout');
@@ -51,6 +79,7 @@ export default function Checkout() {
         },
         paymentMethod: 'cod' as const,
         notes: notes.trim() || undefined,
+        discountCode: coupon?.code,
       };
       const r = await storeApi.post('/orders', body);
       const order = r.data.data;
@@ -92,7 +121,31 @@ export default function Checkout() {
             </div>
           ))}
         </div>
-        <div className="mt-3 flex justify-between border-t pt-3 text-lg font-bold"><span>Total</span><span>{formatCurrency(subtotal)}</span></div>
+        <div className="mt-3 border-t pt-3">
+          {coupon ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-green-700">Code {coupon.code} applied</span>
+              <button type="button" onClick={removeCode} className="text-gray-500 underline">Remove</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="Discount code"
+                className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[#A61E57]"
+              />
+              <button type="button" onClick={applyCode} disabled={applying || !code.trim()} className="rounded-lg border border-[#A61E57] px-3 py-2 text-sm font-semibold text-[#A61E57] disabled:opacity-50">
+                {applying ? '…' : 'Apply'}
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="mt-3 space-y-1 text-sm">
+          <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+          {discount > 0 && <div className="flex justify-between text-green-700"><span>Discount</span><span>−{formatCurrency(discount)}</span></div>}
+        </div>
+        <div className="mt-2 flex justify-between border-t pt-2 text-lg font-bold"><span>Total</span><span>{formatCurrency(total)}</span></div>
         <button disabled={busy} className="mt-4 w-full rounded-xl bg-[#A61E57] py-3 font-semibold text-white disabled:opacity-60">
           {busy ? 'Placing…' : 'Place order (COD)'}
         </button>

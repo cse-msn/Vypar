@@ -34,6 +34,7 @@ const createSchema = z.object({
   // Online (Razorpay) is added later; COD works now.
   paymentMethod: z.enum(['cod', 'online']).default('cod'),
   notes: z.string().trim().optional(),
+  discountCode: z.string().trim().optional(),
 });
 
 // Place an order (reduces stock).
