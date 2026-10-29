@@ -22,7 +22,15 @@ The customer-facing store. Lives in `backend/src/routes/store/` and is mounted a
   `POST /api/store/auth/otp/verify` { phone, otp, name?, anonymousId? } → upserts the Customer by
   phone/whatsapp and returns `{ token, customer }`. `GET /api/store/auth/me`. (`/shop/register` now just
   redirects to the unified `/shop/login`.)
-- `GET /api/store/products` (list; `search`, `category`, `inStock`, pagination), `GET /api/store/products/categories`, `GET /api/store/products/:id`. These use `toPublic()` which exposes only customer-safe fields and the **B2C price** (`b2cPrice ?? sellingPrice`) — never cost/B2B/supplier/HSN.
+- `GET /api/store/products` (list) supports `search`, `collection` (handle|id), `inStock`, pagination, a
+  `sort` (`newest`|`price_asc`|`price_desc`|`gher`), and **faceted filters**: the string facets in
+  `STRING_FACETS` (category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure,
+  bottomType, sizeGroup, fabric — exact match), plus `gher` (number) and `size` (matches `variants.size`).
+  `GET /api/store/products/filters` returns the distinct values for every facet (for the storefront
+  filter dropdowns). `GET /api/store/products/categories`, `GET /api/store/products/:id`. `toPublic()`
+  exposes only customer-safe fields + the **B2C price** (`b2cPrice ?? sellingPrice`) and the apparel
+  attributes (fabric/dupatta/backOpening/blouseSize/gher/sleeves/backClosure/bottomType) — never
+  cost/B2B/supplier/HSN. The storefront UI is the filter panel + sort dropdown in `store/pages/Home.tsx`.
 - `POST /api/store/events` — journey ingest (public, `optionalCustomer`). Batch of events with an `anonymousId`.
 - `POST /api/store/orders` · `GET /api/store/orders` · `GET /api/store/orders/:id` (`requireCustomer`). Create reserves
   stock via `services/orders.ts` → `createOrder` (prices from B2C, reuses `reserveStock`; COD now, Razorpay later).

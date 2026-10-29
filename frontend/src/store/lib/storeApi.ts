@@ -127,8 +127,32 @@ export interface StoreProduct {
   sizeGroup?: string;
   tags?: string[];
   handle?: string;
+  fabric?: string;
+  dupatta?: string;
+  backOpening?: string;
+  blouseSize?: string;
+  gher?: number;
+  sleeves?: string;
+  backClosure?: string;
+  bottomType?: string;
   variants: StoreVariant[];
   inStock: boolean;
+}
+
+/** Distinct facet values for the storefront filter dropdowns (from GET /products/filters). */
+export interface StoreFilterOptions {
+  category: string[];
+  subCategory: string[];
+  dupatta: string[];
+  backOpening: string[];
+  blouseSize: string[];
+  sleeves: string[];
+  backClosure: string[];
+  bottomType: string[];
+  sizeGroup: string[];
+  fabric: string[];
+  gher: number[];
+  size: string[];
 }
 
 export interface StoreCollection {
