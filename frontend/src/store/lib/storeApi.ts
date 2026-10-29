@@ -153,6 +153,7 @@ export interface StoreFilterOptions {
   fabric: string[];
   gher: number[];
   size: string[];
+  color: string[];
 }
 
 export interface StoreCollection {

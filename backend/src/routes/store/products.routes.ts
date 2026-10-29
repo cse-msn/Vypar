@@ -77,6 +77,7 @@ const listQuery = paginationSchema.extend({
   collection: z.string().optional(),
   inStock: z.coerce.boolean().optional(),
   size: z.string().optional(),
+  color: z.string().optional(),
   gher: z.coerce.number().optional(),
   sort: z.enum(['newest', 'price_asc', 'price_desc', 'gher']).optional(),
   // Each string facet is an optional exact-match filter.
@@ -93,6 +94,7 @@ router.get(
     for (const f of STRING_FACETS) if (q[f]) filter[f] = q[f];
     if (q.gher != null) filter.gher = Number(q.gher);
     if (q.size) filter['variants.size'] = q.size;
+    if (q.color) filter['variants.color'] = q.color;
 
     if (q.collection) {
       // Accept a collection handle or id.
@@ -138,7 +140,7 @@ router.get(
         .filter((v) => v !== null && v !== '')
         .sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))));
 
-    const [category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size] =
+    const [category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color] =
       await Promise.all([
         distinct('category'),
         distinct('subCategory'),
@@ -152,10 +154,11 @@ router.get(
         distinct('fabric'),
         distinct('gher'),
         distinct('variants.size'),
+        distinct('variants.color'),
       ]);
 
     res.json({
-      data: { category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size },
+      data: { category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color },
     });
   }),
 );

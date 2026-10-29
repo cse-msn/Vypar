@@ -135,6 +135,14 @@ function extFallbackMime(ext: string): string {
   return map[ext] ?? 'image/jpeg';
 }
 
+/** Map Shopify's product status onto our enum; anything unexpected (e.g. UNLISTED) → active. */
+function mapStatus(s?: string): 'active' | 'draft' | 'archived' {
+  const v = (s || '').toLowerCase();
+  if (v === 'draft') return 'draft';
+  if (v === 'archived') return 'archived';
+  return 'active';
+}
+
 function stripHtml(html?: string): string {
   if (!html) return '';
   return html
@@ -263,7 +271,7 @@ async function importProduct(p: ShopifyProduct): Promise<'created' | 'skipped'> 
     brand: p.vendor || undefined,
     productType: p.productType || undefined,
     tags: p.tags ?? [],
-    status: (p.status || 'ACTIVE').toLowerCase(),
+    status: mapStatus(p.status),
     images,
     videos,
     imageUrl: images[0] || '',

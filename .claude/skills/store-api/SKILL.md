@@ -25,7 +25,7 @@ The customer-facing store. Lives in `backend/src/routes/store/` and is mounted a
 - `GET /api/store/products` (list) supports `search`, `collection` (handle|id), `inStock`, pagination, a
   `sort` (`newest`|`price_asc`|`price_desc`|`gher`), and **faceted filters**: the string facets in
   `STRING_FACETS` (category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure,
-  bottomType, sizeGroup, fabric — exact match), plus `gher` (number) and `size` (matches `variants.size`).
+  bottomType, sizeGroup, fabric — exact match), plus `gher` (number), `size` (matches `variants.size`) and `color` (matches `variants.color`).
   `GET /api/store/products/filters` returns the distinct values for every facet (for the storefront
   filter dropdowns). `GET /api/store/products/categories`, `GET /api/store/products/:id`. `toPublic()`
   exposes only customer-safe fields + the **B2C price** (`b2cPrice ?? sellingPrice`) and the apparel
