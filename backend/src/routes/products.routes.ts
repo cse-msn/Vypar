@@ -48,6 +48,7 @@ const productInput = z.object({
   imageUrl: z.string().trim().optional().or(z.literal('')),
   images: z.array(z.string().trim()).optional(),
   videos: z.array(z.string().trim()).optional(),
+  imageColorTags: z.array(z.object({ image: z.string().trim(), color: z.string().trim() })).optional(),
   customFields: z
     .array(z.object({ label: z.string().trim().min(1), value: z.string().trim().default('') }))
     .optional(),

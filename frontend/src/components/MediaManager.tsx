@@ -11,11 +11,25 @@ export function MediaManager({
   images,
   videos,
   onChange,
+  colorOptions,
+  imageColors,
+  onImageColorsChange,
 }: {
   images: string[];
   videos: string[];
   onChange: (m: { images: string[]; videos: string[] }) => void;
+  /** When provided, each photo gets a colour dropdown so it can be tagged to a colour. */
+  colorOptions?: string[];
+  imageColors?: Record<string, string>;
+  onImageColorsChange?: (map: Record<string, string>) => void;
 }) {
+  const tagColor = (url: string, color: string) => {
+    const next = { ...(imageColors ?? {}) };
+    if (color) next[url] = color;
+    else delete next[url];
+    onImageColorsChange?.(next);
+  };
+  const showTags = !!colorOptions?.length && !!onImageColorsChange;
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -77,9 +91,23 @@ export function MediaManager({
                   <Star className="h-3 w-3" />
                 </button>
               )}
+              {showTags && (
+                <select
+                  value={imageColors?.[url] ?? ''}
+                  onChange={(e) => tagColor(url, e.target.value)}
+                  className="w-full border-t bg-white px-1 py-1 text-xs outline-none"
+                  title="Tag this photo to a colour"
+                >
+                  <option value="">Any colour</option>
+                  {colorOptions!.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
             </div>
           ))}
         </div>
+      )}
+      {showTags && images.length > 0 && (
+        <p className="text-xs text-muted-foreground">Tag a photo to a colour so it shows when a shopper selects that colour. “Any colour” photos show for all.</p>
       )}
 
       {videos.length > 0 && (

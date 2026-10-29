@@ -122,6 +122,7 @@ export interface StoreProduct {
   description?: string;
   images: string[];
   videos: string[];
+  imageColorTags?: { image: string; color: string }[];
   price: number;
   compareAtPrice?: number;
   sizeGroup?: string;

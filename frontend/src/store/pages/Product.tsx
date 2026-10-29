@@ -30,6 +30,18 @@ export default function Product() {
   }, [id]);
 
   const colors = useMemo(() => Array.from(new Set((p?.variants ?? []).map((v) => v.color))), [p]);
+
+  // Photos shown in the gallery: when a colour is picked, prefer photos tagged with that colour;
+  // if none are tagged for it, fall back to the full set. Untagged photos show for every colour.
+  const gallery = useMemo(() => {
+    const all = p?.images ?? [];
+    if (!color) return all;
+    const tags = p?.imageColorTags ?? [];
+    const tagged = tags.filter((t) => t.color === color).map((t) => t.image).filter((u) => all.includes(u));
+    const untaggedForOthers = all.filter((u) => !tags.some((t) => t.image === u));
+    const forColor = [...tagged, ...untaggedForOthers];
+    return forColor.length ? forColor : all;
+  }, [p, color]);
   const sizesForColor = useMemo(
     () => (p?.variants ?? []).filter((v) => v.color === color),
     [p, color],
@@ -53,7 +65,7 @@ export default function Product() {
       color: selected.color,
       size: selected.size,
       price: p.price,
-      image: p.images[0],
+      image: gallery[0] ?? p.images[0],
     });
     trackEvent('add_to_cart', { productId: p.id, variantId: selected.id, quantity: 1, value: p.price });
     toast.success('Added to cart');
@@ -64,15 +76,15 @@ export default function Product() {
       {/* Gallery */}
       <div>
         <div className="aspect-square overflow-hidden rounded-xl border bg-gray-100">
-          {p.images[img] ? (
-            <img src={p.images[img]} alt={p.name} className="h-full w-full object-cover" />
+          {gallery[img] ? (
+            <img src={gallery[img]} alt={p.name} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center text-gray-300">No image</div>
           )}
         </div>
-        {p.images.length > 1 && (
+        {gallery.length > 1 && (
           <div className="mt-3 flex gap-2">
-            {p.images.map((src, i) => (
+            {gallery.map((src, i) => (
               <button key={i} onClick={() => setImg(i)} className={`h-16 w-16 overflow-hidden rounded-lg border-2 ${i === img ? 'border-[#A61E57]' : 'border-transparent'}`}>
                 <img src={src} alt="" className="h-full w-full object-cover" />
               </button>
@@ -105,7 +117,7 @@ export default function Product() {
             {colors.map((c) => (
               <button
                 key={c}
-                onClick={() => { setColor(c); setSize(''); }}
+                onClick={() => { setColor(c); setSize(''); setImg(0); }}
                 className={`rounded-lg border px-3 py-1.5 text-sm ${color === c ? 'border-[#A61E57] bg-[#A61E57]/5 font-medium' : 'border-gray-200'}`}
               >
                 {c}

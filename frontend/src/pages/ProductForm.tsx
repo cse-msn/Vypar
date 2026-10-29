@@ -169,6 +169,7 @@ export default function ProductForm() {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [images, setImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
+  const [imageColors, setImageColors] = useState<Record<string, string>>({}); // image URL → colour tag
   const [collectionsSel, setCollectionsSel] = useState<string[]>([]);
   const [requiresShipping, setRequiresShipping] = useState(true);
   const [allowBackorder, setAllowBackorder] = useState(false);
@@ -252,6 +253,7 @@ export default function ProductForm() {
       setCollectionsSel((product.collections ?? []).map((c) => (typeof c === 'string' ? c : c._id)));
       setRequiresShipping(product.requiresShipping ?? true);
       setAllowBackorder(product.allowBackorder ?? false);
+      setImageColors(Object.fromEntries((product.imageColorTags ?? []).map((t) => [t.image, t.color])));
       // Existing product already has its own B2B/B2C — don't auto-overwrite them from purchase price.
       if (product.b2bPrice != null) setB2bTouched(true);
       if (product.b2cPrice != null) setB2cTouched(true);
@@ -272,6 +274,14 @@ export default function ProductForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useGrid]);
+
+  // Colours available for tagging a photo = the colours used by this product's variants
+  // (falling back to the managed colour list if none are set yet).
+  const watchedVariants = watch('variants');
+  const variantColors = Array.from(
+    new Set(((useGrid ? grid.variants : watchedVariants) ?? []).map((v) => (v as { color?: string }).color).filter(Boolean) as string[]),
+  );
+  const photoColorOptions = variantColors.length ? variantColors : colorNames;
 
   // Show the sub-category dropdown only for apparel categories.
   const selectedCategory = watch('category');
@@ -323,6 +333,10 @@ export default function ProductForm() {
       imageUrl: images[0] || '',
       images,
       videos,
+      // Keep only tags whose image still exists and has a colour chosen.
+      imageColorTags: images
+        .filter((url) => imageColors[url])
+        .map((url) => ({ image: url, color: imageColors[url] })),
       customFields: customFields.filter((f) => f.label.trim()).map((f) => ({ label: f.label.trim(), value: f.value.trim() })),
       costPrice: toNum(values.costPrice) ?? grid.costPrice ?? 0,
       // Retail (selling) price mirrors B2C — the "Selling price" field was removed, so B2C is
@@ -818,7 +832,14 @@ export default function ProductForm() {
         <Card>
           <CardHeader><CardTitle className="text-base">Photos &amp; videos</CardTitle></CardHeader>
           <CardContent>
-            <MediaManager images={images} videos={videos} onChange={(m) => { setImages(m.images); setVideos(m.videos); }} />
+            <MediaManager
+              images={images}
+              videos={videos}
+              onChange={(m) => { setImages(m.images); setVideos(m.videos); }}
+              colorOptions={photoColorOptions}
+              imageColors={imageColors}
+              onImageColorsChange={setImageColors}
+            />
           </CardContent>
         </Card>
 

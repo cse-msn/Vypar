@@ -55,6 +55,8 @@ export interface IProduct {
   imageUrl?: string;
   images: string[];
   videos: string[];
+  /** Optional colour tag per image URL — lets the storefront show colour-specific photos. */
+  imageColorTags: { image: string; color: string }[];
   customFields: ICustomField[];
   costPrice: number;
   sellingPrice: number;
@@ -135,6 +137,10 @@ const productSchema = new Schema<IProduct>(
     imageUrl: { type: String, trim: true },
     images: { type: [String], default: [] },
     videos: { type: [String], default: [] },
+    imageColorTags: {
+      type: [new Schema<{ image: string; color: string }>({ image: { type: String }, color: { type: String, trim: true } }, { _id: false })],
+      default: [],
+    },
     customFields: {
       type: [new Schema<ICustomField>({ label: { type: String, trim: true }, value: { type: String, trim: true } }, { _id: false })],
       default: [],

@@ -33,6 +33,7 @@ function toPublic(p: ProductDoc) {
     description: p.description,
     images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
     videos: p.videos ?? [],
+    imageColorTags: p.imageColorTags ?? [],
     price: p.b2cPrice ?? p.sellingPrice ?? 0,
     compareAtPrice: p.compareAtPrice && p.compareAtPrice > (p.b2cPrice ?? p.sellingPrice ?? 0) ? p.compareAtPrice : undefined,
     sizeGroup: p.sizeGroup,
