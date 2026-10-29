@@ -23,6 +23,7 @@ import crypto from 'crypto';
 import { connectDB, disconnectDB } from '../config/db';
 import { logger } from '../utils/logger';
 import { Product } from '../models/Product';
+import { Color } from '../models/Color';
 import { getStorage } from '../services/storage';
 import { mimeToExt, isVideoMime } from '../utils/mime';
 
@@ -148,20 +149,52 @@ function stripHtml(html?: string): string {
     .trim();
 }
 
-/** Map a Shopify variant's options onto our required colour + size. */
+// ───────────────────────── Colour / size resolution ─────────────────────────
+// Shopify's option naming is inconsistent (colour-only products, size-only products, flipped
+// option order, a stray "Target gender" option, compound colours like "Navy Blue"). We resolve
+// colour + size ourselves rather than trusting the option position.
+
+// Base colour words (lowercased). A value counts as a colour if ANY of its tokens is a base colour
+// or it mentions "colour" — so "Navy Blue", "Dark Red", "Bottle Green", "Yellow Black" all match.
+const COLOR_WORDS = new Set([
+  'red', 'blue', 'green', 'yellow', 'orange', 'pink', 'purple', 'violet', 'black', 'white', 'grey',
+  'gray', 'brown', 'maroon', 'navy', 'teal', 'cyan', 'magenta', 'beige', 'cream', 'gold', 'golden',
+  'silver', 'peach', 'lavender', 'mustard', 'rust', 'wine', 'rani', 'rama', 'firozi', 'gajari',
+  'mehendi', 'mehndi', 'turquoise', 'olive', 'coffee', 'chiku', 'sky', 'bottle', 'multicolor',
+  'multicolour', 'multi', 'off', 'dark', 'light', 'royal',
+]);
+const SIZE_WORDS = new Set(['xs', 's', 'm', 'l', 'xl', 'xxl', 'xxxl', 'free', 'freesize', 'onesize', 'standard']);
+
+const tokens = (v: string) => v.toLowerCase().trim().split(/[\s/_-]+/).filter(Boolean);
+
+function isColorValue(v: string): boolean {
+  if (/^\d/.test(v.trim())) return false; // anything starting with a digit is a size, not a colour
+  return tokens(v).some((t) => COLOR_WORDS.has(t)) || /colou?r/i.test(v);
+}
+function isSizeValue(v: string): boolean {
+  const t = v.trim().toLowerCase();
+  return /^\d+(\.\d+)?$/.test(t) || /^\d/.test(t) || SIZE_WORDS.has(t.replace(/\s+/g, ''));
+}
+/** Title-case a colour name: "navy blue" → "Navy Blue", keep "Multicolor" as-is. */
+function titleCase(v: string): string {
+  return v.trim().replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Map a Shopify variant's options onto our required colour + size, robustly. */
 function colourAndSize(v: ShopifyVariant, options?: { name: string }[]): { color: string; size: string } {
   const opts = v.selectedOptions ?? [];
-  const byName = (re: RegExp) => opts.find((o) => re.test(o.name))?.value;
-  let color = byName(/colou?r|shade/i);
-  let size = byName(/size/i);
-  if (!size) {
-    // The first option that isn't the colour becomes the size.
-    const nonColor = opts.find((o) => o.value !== color);
-    size = nonColor?.value ?? 'Free';
-  }
-  if (!color) color = 'Default';
-  void options;
-  return { color: color.trim() || 'Default', size: size.trim() || 'Free' };
+  const colorOptName = options?.find((o) => /colou?r|shade/i.test(o.name))?.name;
+  const sizeOptName = options?.find((o) => /size/i.test(o.name))?.name;
+
+  // 1) Prefer the explicitly-named Color / Size options.
+  let color = colorOptName ? opts.find((o) => o.name === colorOptName)?.value : undefined;
+  let size = sizeOptName ? opts.find((o) => o.name === sizeOptName)?.value : undefined;
+
+  // 2) Fall back to value shape — but never borrow an unrelated option (e.g. "Target gender").
+  if (!color) color = opts.map((o) => o.value).find(isColorValue);
+  if (!size) size = opts.map((o) => o.value).find(isSizeValue);
+
+  return { color: color ? titleCase(color) : 'Default', size: (size ?? '').trim() || 'Free' };
 }
 
 async function importProduct(p: ShopifyProduct): Promise<'created' | 'skipped'> {
@@ -207,9 +240,19 @@ async function importProduct(p: ShopifyProduct): Promise<'created' | 'skipped'> 
 
   const shopifySkus = vnodes.map((v) => v.sku).filter(Boolean) as string[];
 
+  const coloursUsed = [...new Set(variants.map((v) => v.color).filter((c) => c && c !== 'Default'))];
+
   if (DRY_RUN) {
-    logger.info(`• [dry-run] ${designNumber} "${p.title}" — ${variants.length} variants, ${images.length} imgs, ${videos.length} vids, ₹${b2cPrice}`);
+    logger.info(
+      `• [dry-run] ${designNumber} "${p.title}" — ${variants.length} variants, ${images.length} imgs, ` +
+        `${videos.length} vids, ₹${b2cPrice} · colours: ${coloursUsed.join(', ') || '—'} · sizes: ${[...new Set(variants.map((v) => v.size))].join(', ')}`,
+    );
     return 'created';
+  }
+
+  // Register any new colours into the managed Colour list so they appear in the admin dropdown.
+  for (const name of coloursUsed) {
+    await Color.updateOne({ name }, { $setOnInsert: { name, active: true } }, { upsert: true }).catch(() => undefined);
   }
 
   await Product.create({

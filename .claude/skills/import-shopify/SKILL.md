@@ -29,9 +29,17 @@ imported (matched by design number `SH-<legacyResourceId>`) is skipped, so re-ru
 title→name · descriptionHtml→description (HTML stripped) · vendor→brand · productType→productType ·
 tags→tags · status→status (active/draft/archived) · handle→handle · media images→`images[]`, videos→
 `videos[]` (stored as `/api/media/<uuid>.<ext>`) · variant price→`b2cPrice` (min across variants) +
-per-variant `sellingPrice`; compareAtPrice→`compareAtPrice` · variant options→colour+size (matched by
-option name `/colou?r/`, `/size/`; sensible fallbacks) · inventoryQuantity→variant `quantity` · Shopify
-SKUs preserved in a `customFields` entry. Our own barcode SKU is auto-generated as usual.
+per-variant `sellingPrice`; compareAtPrice→`compareAtPrice` · variant options→colour+size (see below) ·
+inventoryQuantity→variant `quantity` · Shopify SKUs preserved in a `customFields` entry. Our own barcode
+SKU is auto-generated as usual.
+
+## Colour/size resolution (`colourAndSize` + `isColorValue`/`isSizeValue`)
+Shopify option data is messy — colour-only products, size-only products, flipped option order, a stray
+"Target gender" option, and compound colours ("Navy Blue", "Yellow Black"). The resolver: (1) prefers the
+explicitly-named `Color`/`Size` options from `product.options`; (2) falls back to **value shape** — a value
+is a colour if any token is in `COLOR_WORDS` (so compounds match), a size if numeric / in `SIZE_WORDS` —
+and never borrows an unrelated option. Missing colour → `Default`; missing size → `Free`. Colours are
+title-cased and each distinct one is upserted into the **Color** collection (managed-list dropdown).
 
 ## Gotchas
 - Media MIME is taken from the download's content-type, falling back to the URL extension; only the mimes
