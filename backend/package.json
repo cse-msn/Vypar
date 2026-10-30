@@ -12,6 +12,7 @@
     "seed": "tsx src/scripts/seed.ts",
     "seed:more": "tsx src/scripts/addDummyData.ts",
     "import:shopify": "tsx src/scripts/importShopify.ts",
+    "add:collections": "tsx src/scripts/addCollections.ts",
     "test:api": "tsx src/scripts/apiTest.ts",
     "test": "vitest run",
     "test:watch": "vitest",
