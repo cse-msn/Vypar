@@ -119,6 +119,7 @@ export interface StoreProduct {
   name: string;
   category?: string;
   subCategory?: string;
+  gender?: string;
   description?: string;
   images: string[];
   videos: string[];
@@ -144,6 +145,7 @@ export interface StoreProduct {
 export interface StoreFilterOptions {
   category: string[];
   subCategory: string[];
+  gender: string[];
   dupatta: string[];
   backOpening: string[];
   blouseSize: string[];

@@ -37,6 +37,7 @@ function toPublic(p: ProductDoc) {
     price: p.b2cPrice ?? p.sellingPrice ?? 0,
     compareAtPrice: p.compareAtPrice && p.compareAtPrice > (p.b2cPrice ?? p.sellingPrice ?? 0) ? p.compareAtPrice : undefined,
     sizeGroup: p.sizeGroup,
+    gender: p.gender,
     tags: p.tags ?? [],
     handle: p.handle,
     // Customer-safe apparel attributes (used for detail display + faceted filtering).
@@ -57,6 +58,7 @@ function toPublic(p: ProductDoc) {
 const STRING_FACETS = [
   'category',
   'subCategory',
+  'gender',
   'dupatta',
   'backOpening',
   'blouseSize',
@@ -141,10 +143,11 @@ router.get(
         .filter((v) => v !== null && v !== '')
         .sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))));
 
-    const [category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color] =
+    const [category, subCategory, gender, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color] =
       await Promise.all([
         distinct('category'),
         distinct('subCategory'),
+        distinct('gender'),
         distinct('dupatta'),
         distinct('backOpening'),
         distinct('blouseSize'),
@@ -159,7 +162,7 @@ router.get(
       ]);
 
     res.json({
-      data: { category, subCategory, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color },
+      data: { category, subCategory, gender, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color },
     });
   }),
 );

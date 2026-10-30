@@ -33,6 +33,8 @@ export interface IProduct {
   name: string;
   category?: string;
   subCategory?: string;
+  /** Target gender/audience, used as a storefront filter. */
+  gender?: string;
   /** Named size group the design is sold in (e.g. "20-24-28-32-36") — printed on tags. */
   sizeGroup?: string;
   /** Apparel attributes (only relevant for clothing categories). */
@@ -117,6 +119,7 @@ const productSchema = new Schema<IProduct>(
     name: { type: String, required: true, trim: true },
     category: { type: String, trim: true },
     subCategory: { type: String, trim: true },
+    gender: { type: String, trim: true, index: true },
     sizeGroup: { type: String, trim: true },
     dupatta: { type: String, trim: true },
     dupattaHeight: { type: Number },

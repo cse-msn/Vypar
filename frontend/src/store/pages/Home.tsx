@@ -8,6 +8,7 @@ import { ProductCard } from '../components/ProductCard';
 const FACETS: { key: keyof StoreFilterOptions; label: string }[] = [
   { key: 'category', label: 'Category' },
   { key: 'subCategory', label: 'Sub-category' },
+  { key: 'gender', label: 'Gender' },
   { key: 'color', label: 'Colour' },
   { key: 'dupatta', label: 'Dupatta' },
   { key: 'backOpening', label: 'Back opening' },

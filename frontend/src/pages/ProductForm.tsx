@@ -39,6 +39,9 @@ const CATEGORIES = [
   'Raw Material',
 ] as const;
 
+// Target gender / audience options (storefront filter).
+const GENDERS = ['Male', 'Female', 'Unisex ( Male and female )', 'Kids ( boys and girls )', 'Girls', 'Boys'] as const;
+
 // Default B2B / B2C prices derived from the purchase (cost) price — editable afterwards.
 const B2B_FROM_PURCHASE = 1.6; // 160%
 const B2C_FROM_PURCHASE = 2.1; // 210%
@@ -82,6 +85,7 @@ const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   category: z.string().optional(),
   subCategory: z.string().optional(),
+  gender: z.string().optional(),
   sizeGroup: z.string().optional(),
   dupatta: z.string().optional(),
   dupattaHeight: z.string().optional(),
@@ -201,6 +205,7 @@ export default function ProductForm() {
         name: product.name,
         category: product.category ?? '',
         subCategory: product.subCategory ?? '',
+        gender: product.gender ?? '',
         sizeGroup: product.sizeGroup ?? '',
         dupatta: product.dupatta ?? '',
         dupattaHeight: product.dupattaHeight != null ? String(product.dupattaHeight) : '',
@@ -308,6 +313,7 @@ export default function ProductForm() {
       designNumber: values.designNumber.trim(),
       name: values.name.trim(),
       category: values.category || undefined,
+      gender: values.gender || undefined,
       // Sub-category and the apparel attributes below only apply to apparel categories.
       subCategory: (isApparel && values.subCategory) || undefined,
       dupatta: (isApparel && values.dupatta) || undefined,
@@ -472,6 +478,24 @@ export default function ProductForm() {
                       {CATEGORIES.map((c) => (
                         <SelectItem key={c} value={c}>{c}</SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div>
+              <Label>Gender / audience</Label>
+              <Controller
+                control={control}
+                name="gender"
+                render={({ field }) => (
+                  <Select value={field.value || ''} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      {field.value && !GENDERS.includes(field.value as (typeof GENDERS)[number]) && (
+                        <SelectItem value={field.value}>{field.value}</SelectItem>
+                      )}
+                      {GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 )}

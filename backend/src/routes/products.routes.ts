@@ -28,6 +28,7 @@ const productInput = z.object({
   name: z.string().trim().min(1),
   category: z.string().trim().optional(),
   subCategory: z.string().trim().optional(),
+  gender: z.string().trim().optional(),
   sizeGroup: z.string().trim().optional(),
   dupatta: z.enum(['Yes', 'No']).optional(),
   dupattaHeight: z.coerce.number().min(0).optional(),

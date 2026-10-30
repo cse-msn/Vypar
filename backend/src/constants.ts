@@ -27,6 +27,17 @@ export type OrderPaymentStatus = (typeof ORDER_PAYMENT_STATUS)[number];
 export const ORDER_STATUS = ['placed', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'] as const;
 export type OrderStatus = (typeof ORDER_STATUS)[number];
 
+/** Target gender/audience for a product (storefront filter). */
+export const GENDERS = [
+  'Male',
+  'Female',
+  'Unisex ( Male and female )',
+  'Kids ( boys and girls )',
+  'Girls',
+  'Boys',
+] as const;
+export type Gender = (typeof GENDERS)[number];
+
 /** Discount / coupon code kinds. */
 export const DISCOUNT_TYPES = ['percentage', 'fixed', 'free_shipping'] as const;
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];

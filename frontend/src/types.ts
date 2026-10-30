@@ -41,6 +41,7 @@ export interface Product {
   name: string;
   category?: string;
   subCategory?: string;
+  gender?: string;
   sizeGroup?: string;
   dupatta?: string;
   dupattaHeight?: number;
