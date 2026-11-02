@@ -64,6 +64,7 @@ export interface Product {
   imageUrl?: string;
   images?: string[];
   videos?: string[];
+  colors?: string[];
   imageColorTags?: { image: string; color: string }[];
   customFields?: CustomField[];
   costPrice: number;

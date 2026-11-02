@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { StoreAuthProvider } from './StoreAuthContext';
 import { CartProvider } from './CartContext';
 import { StoreLayout } from './components/StoreLayout';
+import { StoreErrorBoundary } from './components/StoreErrorBoundary';
 import Home from './pages/Home';
 import Product from './pages/Product';
 import Cart from './pages/Cart';
@@ -19,22 +20,24 @@ export default function StoreApp() {
   return (
     <StoreAuthProvider>
       <CartProvider>
-        <Routes>
-          <Route element={<StoreLayout />}>
-            <Route index element={<Home />} />
-            <Route path="product/:id" element={<Product />} />
-            <Route path="collection/:handle" element={<Collection />} />
-            <Route path="cart" element={<Cart />} />
-            <Route path="checkout" element={<Checkout />} />
-            <Route path="login" element={<Login />} />
-            <Route path="register" element={<Register />} />
-            <Route path="orders" element={<Orders />} />
-            <Route path="contact" element={<Contact />} />
-            <Route path="refund-policy" element={<RefundPolicy />} />
-            <Route path="terms" element={<Terms />} />
-            <Route path="*" element={<Home />} />
-          </Route>
-        </Routes>
+        <StoreErrorBoundary>
+          <Routes>
+            <Route element={<StoreLayout />}>
+              <Route index element={<Home />} />
+              <Route path="product/:id" element={<Product />} />
+              <Route path="collection/:handle" element={<Collection />} />
+              <Route path="cart" element={<Cart />} />
+              <Route path="checkout" element={<Checkout />} />
+              <Route path="login" element={<Login />} />
+              <Route path="register" element={<Register />} />
+              <Route path="orders" element={<Orders />} />
+              <Route path="contact" element={<Contact />} />
+              <Route path="refund-policy" element={<RefundPolicy />} />
+              <Route path="terms" element={<Terms />} />
+              <Route path="*" element={<Home />} />
+            </Route>
+          </Routes>
+        </StoreErrorBoundary>
       </CartProvider>
     </StoreAuthProvider>
   );

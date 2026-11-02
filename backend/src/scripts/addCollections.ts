@@ -11,12 +11,12 @@ const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
 
 const COLLECTIONS = [
-  'All items',
   'Women / Ladies Free Size',
   'Kids',
   'Men',
   'Blouses',
   'Jewellery',
+  'All items',
 ];
 
 async function main() {
@@ -27,10 +27,13 @@ async function main() {
       const handle = slug(title);
       const res = await Collection.updateOne(
         { handle },
-        { $setOnInsert: { title, handle, featured: true, active: true, sortOrder: i } },
+        {
+          $setOnInsert: { title, handle, featured: true, active: true },
+          $set: { sortOrder: i },
+        },
         { upsert: true },
       );
-      logger.info(`${res.upsertedCount ? '✓ created' : '• exists '} "${title}" (/${handle})`);
+      logger.info(`${res.upsertedCount ? '✓ created' : '• updated'} "${title}" (/${handle}, sortOrder=${i})`);
       i++;
     }
     logger.info('Done.');

@@ -175,6 +175,7 @@ export default function ProductForm() {
   const [videos, setVideos] = useState<string[]>([]);
   const [imageColors, setImageColors] = useState<Record<string, string>>({}); // image URL → colour tag
   const [collectionsSel, setCollectionsSel] = useState<string[]>([]);
+  const [productColors, setProductColors] = useState<string[]>([]);
   const [requiresShipping, setRequiresShipping] = useState(true);
   const [allowBackorder, setAllowBackorder] = useState(false);
   // Once the user edits a price by hand, stop auto-deriving it from the purchase price.
@@ -256,6 +257,7 @@ export default function ProductForm() {
       setImages(product.images?.length ? product.images : product.imageUrl ? [product.imageUrl] : []);
       setVideos(product.videos ?? []);
       setCollectionsSel((product.collections ?? []).map((c) => (typeof c === 'string' ? c : c._id)));
+      setProductColors(product.colors ?? []);
       setRequiresShipping(product.requiresShipping ?? true);
       setAllowBackorder(product.allowBackorder ?? false);
       setImageColors(Object.fromEntries((product.imageColorTags ?? []).map((t) => [t.image, t.color])));
@@ -339,6 +341,7 @@ export default function ProductForm() {
       imageUrl: images[0] || '',
       images,
       videos,
+      colors: productColors.length ? productColors : undefined,
       // Keep only tags whose image still exists and has a colour chosen.
       imageColorTags: images
         .filter((url) => imageColors[url])
@@ -795,6 +798,32 @@ export default function ProductForm() {
               ) : (
                 <p className="mt-1 text-xs text-muted-foreground">No collections yet — create them under Collections.</p>
               )}
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Product Colours (Multi-select)</Label>
+              {colorNames?.length ? (
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {colorNames.map((c) => {
+                    const on = productColors.includes(c);
+                    return (
+                      <button
+                        type="button"
+                        key={c}
+                        onClick={() => setProductColors(on ? productColors.filter((x) => x !== c) : [...productColors, c])}
+                        className={cn(
+                          'rounded-full border px-3 py-1 text-sm transition',
+                          on ? 'border-primary bg-primary text-primary-foreground font-medium' : 'border-gray-200 text-muted-foreground hover:border-gray-300',
+                        )}
+                      >
+                        {c}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-muted-foreground">Configure colours under Settings &gt; Colours.</p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">Select all colours that apply to this design (e.g. 2-color dresses). In search &amp; filters, selecting any colour will show this item.</p>
             </div>
           </CardContent>
         </Card>

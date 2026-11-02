@@ -5,6 +5,7 @@ import type { StoreProduct } from '../lib/storeApi';
 export function ProductCard({ p }: { p: StoreProduct }) {
   const hasCompare = !!p.compareAtPrice && p.compareAtPrice > p.price;
   const off = hasCompare ? Math.round(((p.compareAtPrice! - p.price) / p.compareAtPrice!) * 100) : 0;
+  const title = p.designNumber ? (p.name.startsWith(p.designNumber) ? p.name : `${p.designNumber} - ${p.name}`) : p.name;
 
   return (
     <Link
@@ -13,7 +14,7 @@ export function ProductCard({ p }: { p: StoreProduct }) {
     >
       <div className="relative aspect-square overflow-hidden bg-gray-100">
         {p.images[0] ? (
-          <img src={p.images[0]} alt={p.name} loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
+          <img src={p.images[0]} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
         ) : (
           <div className="flex h-full items-center justify-center text-gray-300">No image</div>
         )}
@@ -25,7 +26,7 @@ export function ProductCard({ p }: { p: StoreProduct }) {
         )}
       </div>
       <div className="p-3">
-        <p className="truncate text-sm font-medium">{p.name}</p>
+        <p className="truncate text-sm font-medium" title={title}>{title}</p>
         <p className="truncate text-xs text-gray-500">{p.category}</p>
         <div className="mt-1 flex items-baseline gap-2">
           <span className="font-semibold text-[#A61E57]">{formatCurrency(p.price)}</span>

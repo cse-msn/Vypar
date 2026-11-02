@@ -123,6 +123,7 @@ export interface StoreProduct {
   description?: string;
   images: string[];
   videos: string[];
+  colors?: string[];
   imageColorTags?: { image: string; color: string }[];
   price: number;
   compareAtPrice?: number;
@@ -157,6 +158,13 @@ export interface StoreFilterOptions {
   gher: number[];
   size: string[];
   color: string[];
+}
+
+export interface StoreCategoryItem {
+  name: string;
+  count: number;
+  subCategories: string[];
+  image?: string;
 }
 
 export interface StoreCollection {

@@ -281,3 +281,81 @@ describe('Reports', () => {
     expect(Array.isArray(res.body.data.lowStock)).toBe(true);
   });
 });
+
+describe('Storefront Catalog & Facets', () => {
+  beforeAll(async () => {
+    await clearDatabase();
+    ({ auth } = await bootstrapOwner());
+
+    // Create collections: "All items" and "Festive"
+    await auth(api().post('/api/collections')).send({ title: 'All items', handle: 'all-items', sortOrder: 0 }).expect(201);
+    await auth(api().post('/api/collections')).send({ title: 'Festive', handle: 'festive', sortOrder: 1 }).expect(201);
+
+    // Create products with different prices, categories, and colors
+    await createProduct({
+      designNumber: 'P101',
+      name: 'Budget Kurti',
+      category: 'Kurti',
+      subCategory: 'Straight',
+      b2cPrice: 500,
+      colors: ['Yellow', 'Green'],
+      variants: [{ color: 'Yellow', size: 'M', quantity: 5, sellingPrice: 500 }],
+    });
+
+    await createProduct({
+      designNumber: 'P102',
+      name: 'Luxury Lehenga',
+      category: 'Lehenga',
+      subCategory: 'Bridal',
+      b2cPrice: 4500,
+      colors: ['Pink', 'Gold'],
+      variants: [{ color: 'Pink', size: 'Free', quantity: 2, sellingPrice: 4500 }],
+    });
+
+    await createProduct({
+      designNumber: 'P103',
+      name: 'Dual Tone Saree',
+      category: 'Saree',
+      b2cPrice: 1500,
+      colors: ['Pink', 'Blue'],
+      variants: [{ color: 'Pink & Blue', size: 'Free', quantity: 3, sellingPrice: 1500 }],
+    });
+  });
+
+  it('guarantees "All items" is always at the end in /api/store/collections', async () => {
+    const res = await api().get('/api/store/collections').expect(200);
+    expect(res.body.data.length).toBe(2);
+    const last = res.body.data[res.body.data.length - 1];
+    expect(last.handle).toBe('all-items');
+  });
+
+  it('returns category-tree with counts and subcategories', async () => {
+    const res = await api().get('/api/store/products/category-tree').expect(200);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    const kurti = res.body.data.find((c: any) => c.name === 'Kurti');
+    expect(kurti).toBeDefined();
+    expect(kurti.count).toBe(1);
+    expect(kurti.subCategories).toContain('Straight');
+  });
+
+  it('sorts accurately by effective price asc and desc', async () => {
+    const asc = await api().get('/api/store/products?sort=price_asc').expect(200);
+    const ascPrices = asc.body.data.map((p: any) => p.price);
+    expect(ascPrices).toEqual([500, 1500, 4500]);
+
+    const desc = await api().get('/api/store/products?sort=price_desc').expect(200);
+    const descPrices = desc.body.data.map((p: any) => p.price);
+    expect(descPrices).toEqual([4500, 1500, 500]);
+  });
+
+  it('filters by multiple colors and matches combo or product colors', async () => {
+    // Search for Blue: should match Dual Tone Saree (Pink & Blue)
+    const resBlue = await api().get('/api/store/products?color=Blue').expect(200);
+    expect(resBlue.body.data.some((p: any) => p.name === 'Dual Tone Saree')).toBe(true);
+
+    // Search for Pink,Green: matches both P101 (Green) and P102/P103 (Pink)
+    const resMulti = await api().get('/api/store/products?color=Pink,Green').expect(200);
+    expect(resMulti.body.data.length).toBe(3);
+  });
+});
+

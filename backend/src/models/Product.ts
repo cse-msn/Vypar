@@ -57,6 +57,8 @@ export interface IProduct {
   imageUrl?: string;
   images: string[];
   videos: string[];
+  /** Optional colour tags for the product (e.g. multi-color items). */
+  colors?: string[];
   /** Optional colour tag per image URL — lets the storefront show colour-specific photos. */
   imageColorTags: { image: string; color: string }[];
   customFields: ICustomField[];
@@ -140,6 +142,7 @@ const productSchema = new Schema<IProduct>(
     imageUrl: { type: String, trim: true },
     images: { type: [String], default: [] },
     videos: { type: [String], default: [] },
+    colors: { type: [String], default: [] },
     imageColorTags: {
       type: [new Schema<{ image: string; color: string }>({ image: { type: String }, color: { type: String, trim: true } }, { _id: false })],
       default: [],

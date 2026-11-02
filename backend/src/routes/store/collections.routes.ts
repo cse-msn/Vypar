@@ -21,6 +21,14 @@ router.get(
     const filter: Record<string, unknown> = { active: true };
     if (req.query.featured === 'true') filter.featured = true;
     const items = await Collection.find(filter).sort({ sortOrder: 1, title: 1 });
+    const isAllItems = (c: CollectionDoc) => c.handle === 'all-items' || /^all\s*items$/i.test(c.title);
+    items.sort((a, b) => {
+      const aAll = isAllItems(a);
+      const bAll = isAllItems(b);
+      if (aAll && !bAll) return 1;
+      if (!aAll && bAll) return -1;
+      return (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.title.localeCompare(b.title);
+    });
     res.json({ data: items.map(toPublic) });
   }),
 );

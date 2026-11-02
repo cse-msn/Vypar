@@ -16,14 +16,21 @@ const router = Router();
  * supplier, HSN and internal attributes are intentionally omitted. The customer price
  * is the B2C price (falling back to selling price for legacy products).
  */
-function toPublic(p: ProductDoc) {
-  const variants = p.variants.map((v) => ({
+function toPublic(p: ProductDoc | Record<string, any>) {
+  const variants = ((p.variants as any[]) || []).map((v) => ({
     id: String(v._id),
     color: v.color,
     size: v.size,
     sku: v.sku,
     inStock: v.quantity > 0,
   }));
+  const colors = Array.from(
+    new Set([
+      ...((p.colors as string[]) ?? []),
+      ...variants.map((v) => v.color).filter(Boolean),
+      ...((p.imageColorTags as { color: string }[]) ?? []).map((t) => t.color).filter(Boolean),
+    ]),
+  );
   return {
     id: String(p._id),
     designNumber: p.designNumber,
@@ -33,6 +40,7 @@ function toPublic(p: ProductDoc) {
     description: p.description,
     images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
     videos: p.videos ?? [],
+    colors,
     imageColorTags: p.imageColorTags ?? [],
     price: p.b2cPrice ?? p.sellingPrice ?? 0,
     compareAtPrice: p.compareAtPrice && p.compareAtPrice > (p.b2cPrice ?? p.sellingPrice ?? 0) ? p.compareAtPrice : undefined,
@@ -97,30 +105,77 @@ router.get(
     for (const f of STRING_FACETS) if (q[f]) filter[f] = q[f];
     if (q.gher != null) filter.gher = Number(q.gher);
     if (q.size) filter['variants.size'] = q.size;
-    if (q.color) filter['variants.color'] = q.color;
+
+    const andClauses: Record<string, unknown>[] = [];
+
+    if (q.color) {
+      const rawColors = String(q.color).split(',').map((c) => c.trim()).filter(Boolean);
+      if (rawColors.length > 0) {
+        const regexes = rawColors.map((c) => new RegExp(`(^|[/,&+\\s])${escapeRegex(c)}($|[/,&+\\s])`, 'i'));
+        andClauses.push({
+          $or: [
+            { 'variants.color': { $in: regexes } },
+            { colors: { $in: regexes } },
+          ],
+        });
+      }
+    }
 
     if (q.collection) {
-      // Accept a collection handle or id.
-      const handle = String(q.collection);
-      const col = await Collection.findOne({
-        active: true,
-        $or: [{ handle: handle.toLowerCase() }, ...(Types.ObjectId.isValid(handle) ? [{ _id: handle }] : [])],
-      });
-      filter.collections = col ? col._id : null; // unknown handle → no results
-    }
-    if (q.inStock) filter['variants.quantity'] = { $gt: 0 };
-    if (q.search) {
-      const rx = new RegExp(escapeRegex(String(q.search)), 'i');
-      filter.$or = [{ designNumber: rx }, { name: rx }, { category: rx }, { subCategory: rx }];
+      const handle = String(q.collection).toLowerCase();
+      // 'all-items' or 'all' represents all products in the catalog
+      if (handle !== 'all-items' && handle !== 'all') {
+        const col = await Collection.findOne({
+          active: true,
+          $or: [{ handle }, ...(Types.ObjectId.isValid(handle) ? [{ _id: handle }] : [])],
+        });
+        filter.collections = col ? col._id : null; // unknown handle → no results
+      }
     }
 
-    const sort = SORTS[String(q.sort ?? 'newest')] ?? SORTS.newest;
+    if (q.inStock) filter['variants.quantity'] = { $gt: 0 };
+
+    if (q.search) {
+      const rx = new RegExp(escapeRegex(String(q.search)), 'i');
+      andClauses.push({
+        $or: [{ designNumber: rx }, { name: rx }, { category: rx }, { subCategory: rx }],
+      });
+    }
+
+    if (andClauses.length > 0) {
+      filter.$and = andClauses;
+    }
+
     const page = Number(q.page) || 1;
     const { skip, limit } = paginate(page, Number(q.limit) || 20);
-    const [items, total] = await Promise.all([
-      Product.find(filter).sort(sort).skip(skip).limit(limit),
-      Product.countDocuments(filter),
-    ]);
+
+    const sortDir = q.sort === 'price_asc' ? 1 : q.sort === 'price_desc' ? -1 : null;
+    let items: any[];
+    let total: number;
+
+    if (sortDir !== null) {
+      const [aggItems, count] = await Promise.all([
+        Product.aggregate([
+          { $match: filter },
+          { $addFields: { effectivePrice: { $ifNull: ['$b2cPrice', { $ifNull: ['$sellingPrice', 0] }] } } },
+          { $sort: { effectivePrice: sortDir, createdAt: -1 } },
+          { $skip: skip },
+          { $limit: limit },
+        ]),
+        Product.countDocuments(filter),
+      ]);
+      items = aggItems;
+      total = count;
+    } else {
+      const sort = SORTS[String(q.sort ?? 'newest')] ?? SORTS.newest;
+      const [foundItems, count] = await Promise.all([
+        Product.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+        Product.countDocuments(filter),
+      ]);
+      items = foundItems;
+      total = count;
+    }
+
     res.json({ data: items.map(toPublic), meta: buildMeta(total, page, limit) });
   }),
 );
@@ -133,36 +188,121 @@ router.get(
   }),
 );
 
-/** Distinct values for every facet, so the storefront can populate its filter dropdowns. */
+/** Category tree with subcategories and product counts for the storefront homepage */
+router.get(
+  '/category-tree',
+  asyncHandler(async (_req, res) => {
+    const raw = await Product.aggregate<{
+      _id: string;
+      count: number;
+      subCategories: string[];
+      images: string[];
+      imageUrls: string[];
+    }>([
+      { $match: { active: true, category: { $nin: [null, ''] } } },
+      {
+        $group: {
+          _id: '$category',
+          count: { $sum: 1 },
+          subCategories: { $addToSet: '$subCategory' },
+          images: { $push: { $arrayElemAt: ['$images', 0] } },
+          imageUrls: { $push: '$imageUrl' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const tree = raw.map((c) => {
+      const validImages = [...(c.images || []), ...(c.imageUrls || [])].filter(Boolean);
+      return {
+        name: c._id,
+        count: c.count,
+        subCategories: (c.subCategories || []).filter(Boolean).sort(),
+        image: validImages[0] || undefined,
+      };
+    });
+
+    res.json({ data: tree });
+  }),
+);
+
+/** Distinct values for every facet, scoped to the active collection/category */
 router.get(
   '/filters',
-  asyncHandler(async (_req, res) => {
-    const base = { active: true };
+  asyncHandler(async (req, res) => {
+    const base: Record<string, unknown> = { active: true };
+    if (req.query.collection) {
+      const handle = String(req.query.collection).toLowerCase();
+      if (handle !== 'all-items' && handle !== 'all') {
+        const col = await Collection.findOne({
+          active: true,
+          $or: [{ handle }, ...(Types.ObjectId.isValid(handle) ? [{ _id: handle }] : [])],
+        });
+        base.collections = col ? col._id : null;
+      }
+    }
+    if (req.query.category) {
+      base.category = String(req.query.category);
+    }
+
     const distinct = async (field: string) =>
       ((await Product.distinct(field, { ...base, [field]: { $nin: [null, ''] } })) as (string | number)[])
         .filter((v) => v !== null && v !== '')
         .sort((a, b) => (typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b))));
 
-    const [category, subCategory, gender, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color] =
-      await Promise.all([
-        distinct('category'),
-        distinct('subCategory'),
-        distinct('gender'),
-        distinct('dupatta'),
-        distinct('backOpening'),
-        distinct('blouseSize'),
-        distinct('sleeves'),
-        distinct('backClosure'),
-        distinct('bottomType'),
-        distinct('sizeGroup'),
-        distinct('fabric'),
-        distinct('gher'),
-        distinct('variants.size'),
-        distinct('variants.color'),
-      ]);
+    const [
+      category,
+      subCategory,
+      gender,
+      dupatta,
+      backOpening,
+      blouseSize,
+      sleeves,
+      backClosure,
+      bottomType,
+      sizeGroup,
+      fabric,
+      gher,
+      size,
+      varColors,
+      prodColors,
+    ] = await Promise.all([
+      distinct('category'),
+      distinct('subCategory'),
+      distinct('gender'),
+      distinct('dupatta'),
+      distinct('backOpening'),
+      distinct('blouseSize'),
+      distinct('sleeves'),
+      distinct('backClosure'),
+      distinct('bottomType'),
+      distinct('sizeGroup'),
+      distinct('fabric'),
+      distinct('gher'),
+      distinct('variants.size'),
+      distinct('variants.color'),
+      distinct('colors'),
+    ]);
+
+    const color = Array.from(new Set([...varColors, ...prodColors].map(String))).sort();
 
     res.json({
-      data: { category, subCategory, gender, dupatta, backOpening, blouseSize, sleeves, backClosure, bottomType, sizeGroup, fabric, gher, size, color },
+      data: {
+        category,
+        subCategory,
+        gender,
+        dupatta,
+        backOpening,
+        blouseSize,
+        sleeves,
+        backClosure,
+        bottomType,
+        sizeGroup,
+        fabric,
+        gher,
+        size,
+        color,
+      },
     });
   }),
 );

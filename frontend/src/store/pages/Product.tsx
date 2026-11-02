@@ -29,7 +29,11 @@ export default function Product() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const colors = useMemo(() => Array.from(new Set((p?.variants ?? []).map((v) => v.color))), [p]);
+  const colors = useMemo(() => {
+    const fromVariants = (p?.variants ?? []).map((v) => v.color);
+    const fromProduct = p?.colors ?? [];
+    return Array.from(new Set([...fromProduct, ...fromVariants])).filter(Boolean);
+  }, [p]);
 
   // Photos shown in the gallery: when a colour is picked, prefer photos tagged with that colour;
   // if none are tagged for it, fall back to the full set. Untagged photos show for every colour.
@@ -96,7 +100,7 @@ export default function Product() {
       {/* Details */}
       <div>
         <p className="text-xs uppercase tracking-wide text-gray-400">{p.category}{p.subCategory ? ` · ${p.subCategory}` : ''}</p>
-        <h1 className="mt-1 text-2xl font-bold">{p.name}</h1>
+        <h1 className="mt-1 text-2xl font-bold">{p.designNumber ? (p.name.startsWith(p.designNumber) ? p.name : `${p.designNumber} - ${p.name}`) : p.name}</h1>
         <div className="mt-2 flex items-baseline gap-3">
           <span className="text-2xl font-semibold text-[#A61E57]">{formatCurrency(p.price)}</span>
           {!!p.compareAtPrice && p.compareAtPrice > p.price && (

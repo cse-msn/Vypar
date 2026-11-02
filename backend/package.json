@@ -15,6 +15,7 @@
     "add:collections": "tsx src/scripts/addCollections.ts",
     "fill:collections": "tsx src/scripts/fillCollections.ts",
     "fill:gender": "tsx src/scripts/fillGender.ts",
+    "fill:category": "tsx src/scripts/fillCategory.ts",
     "test:api": "tsx src/scripts/apiTest.ts",
     "test": "vitest run",
     "test:watch": "vitest",
