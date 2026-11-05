@@ -13,12 +13,13 @@ export function StoreLayout() {
   return (
     <div className="min-h-screen bg-[#FBF8FA] text-[#1b1b1b]">
       <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 sm:flex-nowrap">
           <Link to="/shop" className="shrink-0 text-xl font-bold tracking-tight text-[#A61E57]">
             MNM Fashion
           </Link>
           <form
-            className="relative ml-2 hidden flex-1 sm:block"
+            role="search"
+            className="relative order-last w-full sm:order-none sm:ml-2 sm:w-auto sm:flex-1"
             onSubmit={(e) => {
               e.preventDefault();
               navigate(`/shop?q=${encodeURIComponent(q)}`);
